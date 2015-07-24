@@ -2,7 +2,7 @@
 //	Isadora Python Plugin		  ©2003 Mark F. Coniglio. All rights reserved.
 // ===========================================================================
 //
-//  Based on ExecutePythonFunction.cpp ©2003 Mark F. Coniglio.
+//	Based on ExecutePythonFunction.cpp ©2003 Mark F. Coniglio.
 //
 //	IMPORTANT: This source code ("the software") is supplied to you in
 //	consideration of your agreement to the following terms. If you do not
@@ -32,19 +32,6 @@
 // you will need to customize the file are marked with this pattern of 
 // characters.
 //
-// ABOUT IMAGE BUFFER MAPS:
-//
-// The ImageBufferMap structure, and its accompanying functions,
-// exists as a convenience to those writing video processing plugins.
-//
-// Basically, an image buffer contains an arbitrary number of input and
-// output buffers (in the form of ImageBuffers). The ImageBufferMap code
-// will automatically create intermediary buffers if needed, so that the
-// size and depth of the source image buffers sent to your callback are
-// the same for all buffers.
-// 
-// Typically, the ImageBufferMap is created in your CreateActor function,
-// and dispose in the DiposeActor function.
 
 // ---------------------------------------------------------------------------------
 // INCLUDES
@@ -62,6 +49,9 @@
 #include <float.h>
 
 #include <Python.h>
+
+#define MAX_PARAMETERS 10
+#define MAX_TYPE_STRING_SIZE 4
 
 // ---------------------------------------------------------------------------------
 // MacOS Specific
@@ -141,9 +131,27 @@ ReceiveMessage(
 // GLOBAL VARIABLES
 // ---------------------------------------------------------------------------------
 // ### Declare global variables, common to all instantiations of this plugin here
+Boolean isPath = false;
+Boolean isFile = false;
+Boolean isFunc = false;
+int numArgs = 0;
 
-// Example: static int gMyGlobalVariable = 5;
+// For the file path
+char *gPath; 
+char *gFile;
+char *gFunc;
+char *buffer;
 
+// For parameter input
+char **paramNames;
+char paramTypes[MAX_PARAMETERS][MAX_TYPE_STRING_SIZE];
+Value parameters[MAX_PARAMETERS];
+int parametersFlt[MAX_PARAMETERS];
+float parametersInt[MAX_PARAMETERS];
+char* parametersStr[MAX_PARAMETERS];
+int types[MAX_PARAMETERS];
+
+int size,i;
 // ---------------------------------------------------------------------------------
 // PluginInfo struct
 // ---------------------------------------------------------------------------------
@@ -155,19 +163,16 @@ ReceiveMessage(
 // file. Any static variable will be global to all instantiations of the plugin.
 
 typedef struct {
-
-	ActorInfo*				mActorInfoPtr;		// our ActorInfo Pointer - set during create actor function
-	MessageReceiverRef		mMessageReceiver;	// pointer to our message receiver reference
-	Boolean					mNeedsDraw;			// set to true when the video output needs to be drawn
+	ActorInfo*			mActorInfoPtr;
 	
-	
-	ImageBufferMap			mImageBufferMap;	// used by most video plugins -- see about ImageBufferMaps above
-	
-	float					mRedAmount;			// ### Demo Plugin - value = -1.0 to +1.0
-	float					mGreenAmount;		// ### Demo Plugin - value = -1.0 to +1.0
-	float					mBlueAmount;		// ### Demo Plugin - value = -1.0 to +1.0
-	Boolean					mBypass;
-	
+	char*				mPath;
+	char*				mFile;
+	char*				mFunc;
+	Boolean				mParams;
+	Boolean				mOutputs;
+	float				mTest;
+	int					mI0;
+	int					mI1;
 } PluginInfo;
 
 // A handy macro for casting the mActorDataPtr to PluginInfo*
@@ -186,7 +191,7 @@ typedef struct {
 // Define the group under which this plugin will be displayed in the Isadora interface.
 // These are defined under "Actor Types" in IsadoraTypes.h
 
-static const OSType	kActorClass 	= kGroupVideo;
+static const OSType	kActorClass 	= kGroupControl;
 
 // ### PLUGIN IN
 // Define the plugin's unique four character identifier. Contact TroikaTronix to
@@ -219,15 +224,16 @@ static const char* sPropertyDefinitionString =
 
 // INPUT PROPERTY DEFINITIONS
 //	TYPE 	PROPERTY NAME	ID		DATATYPE	DISPLAY FMT			MIN		MAX		INIT VALUE
-	"INPROP video_in		vin		data		video				*		*		0\r"
-	"INPROP red				red		float		number				-100	100		0\r"
-	"INPROP green			grn		float		number				-100	100		0\r"
-	"INPROP blue			blu		float		number				-100	100		0\r"
-	"INPROP	bypass			byps	bool		onoff				0		1		0\r"
+	"INPROP		input		path	string		text				*		*		\r"
+	"INPROP		input		file	string		text				*		*		\r"
+	"INPROP		input		func	string		text				*		*		\r"
+	"INPROP 	params		parm	bool		onoff				0		1		0\r"
+	"INPROP		outputs		oupt	bool		onoff				0		1		0\r"
+	"INPROP		testing		test	float		number				*		*		0\r"
 
 // OUTPUT PROPERTY DEFINITIONS
 //	TYPE 	 PROPERTY NAME	ID		DATATYPE	DISPLAY FMT			MIN		MAX		INIT VALUE
-	"OUTPROP video_out		vout	data		video				*		*		0\r";
+	"OUTPROP	output		out		float		number				*		*		0\r";
 
 // ### Property Index Constants
 // Properties are referenced by a one-based index. The first input property will
@@ -237,13 +243,16 @@ static const char* sPropertyDefinitionString =
 
 enum
 {
-	kInputVideoIn = 1,
-	kInputRed,
-	kInputGreen,
-	kInputBlue,
-	kInputBypass,
+	kInputPath = 1,
+	kInputFile,
+	kInputFunc,
+	kInputParams,
+	kInputOutputs,
+	kInputTest,
+	kInput00 = 7,
+	kInput01 = 8,
 	
-	kOutputVideo = 1
+	kOutput
 };
 
 
@@ -264,24 +273,32 @@ enum
 
 const char* sHelpStrings[] =
 {
-	"Changes the level of the red, green and blue components of a video image.",
-
-	"The video source that will be colorized.",
+	"Finds a python function and performs the operation.",
 	
-	"The amount by which the red component of the image will be changed. Values greater than zero "
-		"increase the amount of red, values less than zero descrease it.",
-
-	"The amount by which the green component of the image will be changed. Values greater than zero "
-		"increase the amount of green, values less than zero descrease it.",
-
-	"The amount by which the blue component of the image will be changed. Values greater than zero "
-		"increase the amount of blue, values less than zero descrease it.",
-		
-	"Bypasses this effect when set to 'on'. When 'off' the effect functions normally.",
+	"Specifies the directory.",
 	
-	"The colorized video output."
+	"Specifices a python module within the selected directory.",
+	
+	"Specifices a python function within the selected module.",
+	
+	"Determines the behaviour when changing 'select':\r"
+	"- <normal> operates just like the 'Router' actor\r"
+	"- <clear> sets the value of the output to 0 when a new output is selected\r"
+	"- <restore> returns the output to its original value when a new output is selected (unless 'in' changes while the output is selected)",
+	
+	"Outputs data arriving at the 'value' input when the 'select' input specifies this output. "
+	"Note that this input is mutable: it, the other outputs, and the 'in' input will "
+	"change their type to match the input property to which it is linked."
 };
 
+// * User Constants
+const UInt32	kFixedInputValues	= 0;
+const UInt32	kFixedOutputValues	= 0;
+
+// Do not need these
+const SInt16	kAcrossLineWidth	= 15;
+const SInt16	kLineWidth			= 2;
+const SInt16	kSwitchAreaWidth	= kAcrossLineWidth * 2;
 // ---------------------------------------------------------------------------------
 //		¥ CreateActor
 // ---------------------------------------------------------------------------------
@@ -301,14 +318,6 @@ CreateActor(
 	
 	ioActorInfo->mActorDataPtr = info;
 	info->mActorInfoPtr = ioActorInfo;
-
-	// ### allocation and initialization of private member variables
-	
-	// set number of input and output buffers in our buffer map
-	// and then initialize it
-	info->mImageBufferMap.mInputBufferCount = 1;
-	info->mImageBufferMap.mOutputBufferCount = 1;
-	CreateImageBufferMap(ip, &info->mImageBufferMap);
 }
 
 // ---------------------------------------------------------------------------------
@@ -327,8 +336,6 @@ DisposeActor(
 	
 	// ### destruction of private member variables
 	
-	// destroy our image buffer map
-	DisposeImageBufferMap(ip, &info->mImageBufferMap);
 
 	// destroy the PluginInfo struct allocated with IzzyMallocClear_ the CreateActor function
 	PluginAssert_(ip, ioActorInfo->mActorDataPtr != nil);
@@ -352,7 +359,6 @@ ActivateActor(
 	// ------------------------
 	// ACTIVATE
 	// ------------------------
-	
 	if (inActivate) {
 	
 		// Isadora passes various messages to plugins that request them.
@@ -365,33 +371,6 @@ ActivateActor(
 		// like to receive. (These are bitmapped flags, so you can combine as
 		// many as you like: kWantKeyDown | kWantKeyDown for instance.)
 		
-		// Here we request that our ReceiveMessage function is called
-		// whenever the Isadora New Video Frame message is sent,
-		// which happens periodically, 30 times per second. We set the ref
-		// con to our ActorInfo ptr so that we can access that information
-		// from ReceiveMessage callback.
-		
-		MessageReceiveFunction* msgRcvFunc = ReceiveMessage;
-		
-		// if the "bypass" flag is off, then we want to receive messages
-		if (info->mBypass == false) {
-			
-			// we should not already have a message receiver
-			PluginAssert_(ip, info->mMessageReceiver == nil);
-			
-			// create a message receiver that will be notified of
-			// video frame ticks
-			info->mMessageReceiver = CreateMessageReceiver_(
-				ip,
-				msgRcvFunc,
-				0,
-				kWantVideoFrameTick,
-				(long) inActorInfo);
-		}
-		
-		// set the needs draw flag so that we will be drawn as soon
-		// as possible
-		info->mNeedsDraw = true;
 	
 	// ------------------------
 	// DEACTIVATE
@@ -399,17 +378,6 @@ ActivateActor(
 	
 	} else {
 	
-		// dispose our message receiver when we are deactivated.
-		if (info->mMessageReceiver != nil) {
-			DisposeMessageReceiver_(ip, info->mMessageReceiver);
-			info->mMessageReceiver = nil;
-			info->mNeedsDraw |= true;
-		}
-		
-		// ### dispose any data that you don't need when 
-		// you are not active.
-		DisposeOwnedImageBuffers(ip, &info->mImageBufferMap);
-		ClearSourceBuffers(ip, &info->mImageBufferMap);
 	}
 }
 
@@ -445,6 +413,14 @@ GetHelpString(
 	UInt32				inMaxCharacters)		// size of the outParamaterString buffer
 {
 	const char* helpstr = nil;
+	// if the input the user is asking about is
+	// past the end of the fixed properties, then
+	// we force it to the first fixed property
+	if (inPropertyType == kOutputProperty) {
+		//if (inPropertyIndex1 >= kFirstVariablePropertyIndex1) {
+		//	inPropertyIndex1 = kFirstVariablePropertyIndex1;
+		//}
+	}
 	
 	// The PropertyTypeAndIndexToHelpIndex_ converts the inPropertyType and
 	// inPropertyIndex1 parameters to determine the zero-based index into
@@ -456,6 +432,318 @@ GetHelpString(
 	
 	// copy it to the output string
 	strncpy(outParamaterString, helpstr, inMaxCharacters);
+}
+
+// ---------------------------------------------------------------------------------
+//		? CreatePropertyID	[INTERRUPT SAFE]
+// ---------------------------------------------------------------------------------
+
+inline OSType
+CreatePropertyID(
+	IsadoraParameters*	ip,
+	const char*			inRateBase,
+	SInt32				inIndex)
+{
+	const SInt32 kOneCharMax = 26;
+	const SInt32 kTwoCharMax = kOneCharMax * kOneCharMax;
+	
+	PluginAssert_(ip, inRateBase[0] != 0 && inRateBase[1] != 0);
+	PluginAssert_(ip, inIndex >= 0 && inIndex < kTwoCharMax * 2);
+	
+	OSType	result = (((UInt32) inRateBase[0]) << 24) | (((UInt32) inRateBase[1]) << 16);
+	
+	SInt32 indexLS;
+	SInt32 indexMS;
+	SInt32 indexOffset;
+	
+	// in index is between 00 and 99
+	if (inIndex >= 0 && inIndex < 100) {
+		
+		indexMS = inIndex / 10;
+		indexLS = inIndex % 10;
+		
+		result |= ( (((UInt32) (indexMS + '0')) << 8) | (((UInt32) (indexLS + '0')) << 0) );
+		
+		// if between 100 and 776
+	} else if (inIndex >= 100 && inIndex < 100 + kTwoCharMax) {
+		
+		indexOffset = inIndex - 100;
+		PluginAssert_(ip, indexOffset >= 0 && indexOffset < kTwoCharMax);
+		indexMS = indexOffset / kOneCharMax;
+		indexLS = indexOffset % kOneCharMax;
+		
+		result |= ( (((UInt32) (indexMS + 'A')) << 8) | (((UInt32) (indexLS + 'A')) << 0) );
+		
+		// if between 776 and 1452
+	} else if (inIndex >= 100 + kTwoCharMax && inIndex < 100 + kTwoCharMax * 2) {
+		
+		indexOffset = inIndex - (100 + kTwoCharMax);
+		PluginAssert_(ip, indexOffset >= 0 && indexOffset < kTwoCharMax);
+		indexMS = indexOffset / kOneCharMax;
+		indexLS = indexOffset % kOneCharMax;
+		
+		result |= ( (((UInt32) (indexMS + 'a')) << 8) | (((UInt32) (indexLS + 'a')) << 0) );
+		
+	} else {
+		PluginAssert_(ip, false);
+	}
+	
+	return result;
+}
+
+// ---------------------------------------------------------------------------------
+//		 FindPythonFunc
+// ---------------------------------------------------------------------------------
+static int
+FindPythonFunc(
+	char *path)
+{	
+	PyObject *pName, *pModule, *pDict, *pFunc, *pInspect, *argspec_tuple, *arglist;
+	int size, i;
+	
+	//FILE *fp;
+	//fp=fopen("/Users/danelson/Desktop/params.txt", "w");
+	//fprintf(fp, "Python Function\n");
+	
+	// Initialize the python interpreter
+	Py_Initialize();
+	
+	// Make sure we are getting the module from the correct place
+	PyRun_SimpleString("import sys");
+	PyRun_SimpleString(path);
+	
+	// Build the name object
+	pName = PyString_FromString(gFile);
+	if (pName != NULL)
+	{	
+		// Load the module object
+		pModule = PyImport_Import(pName);
+		Py_DECREF(pName);
+		if (pModule != NULL)
+		{
+			// pDict is a borrowed reference
+			pDict = PyModule_GetDict(pModule);
+			Py_DECREF(pModule);
+			if (pDict != NULL)
+			{
+				// pFunc is a borrowed reference
+				pFunc = PyDict_GetItemString(pDict, gFunc);
+			}
+		}
+	}
+	
+	pName = PyString_FromString("inspect");	
+	if (pName != NULL)
+	{
+		pInspect = PyImport_Import(pName);
+		Py_DECREF(pName);
+		if (pInspect != NULL)
+		{
+			pName = PyString_FromString("getargspec");
+			if (pName != NULL)
+			{
+				argspec_tuple = PyObject_CallMethodObjArgs(pInspect, pName, pFunc, NULL);
+				Py_DECREF(pName);
+				if (argspec_tuple != NULL)
+				{
+					arglist = PyTuple_GetItem(argspec_tuple, 0);
+					if (arglist != NULL)
+					{
+						// get the number arguments
+						size = (int)PyObject_Size(arglist);
+						
+						//allocate memory for strings and types
+						paramNames = (char**)malloc(size*sizeof(char));
+						
+						for ( i=0; i<size; i++)
+						{
+							//grab the list of parameters
+							PyObject *list = PyList_GetItem(arglist,i);
+							
+							//grab python strings from the list
+							PyObject *first = PyObject_Str(list);
+							
+							//convert python string to C string
+							paramNames[i] = PyString_AsString(first);
+							
+							// get the types by chopping after the underscore
+							char *temp = PyString_AsString(first);
+							char *delims = "_";
+							char *result;
+							result = strtok( temp, delims );
+							
+							// ### CHECK THIS STRUCTURE
+							while( result != NULL )
+							{
+								result = strtok( NULL, delims );
+								if (result == NULL)
+								{
+									break;
+								}
+								else
+								{
+									//strcpy(paramTypes[i],result);
+									if (strcmp(result,"str") == 0)
+									{
+										types[i] = 0;
+									}
+									else if (strcmp(result,"int") == 0)
+									{
+										types[i] = 1;
+									}
+									else if (strcmp(result,"flt") == 0)
+									{
+										types[i] = 2;
+									}
+								}
+							}
+							
+							//fprintf(fp,"Parameter name %d: %s\n",i,paramNames[i]);
+							//fprintf(fp,"Parameter type %d: %s\n",i,paramTypes[i]);
+							//fprintf(fp,"Parameter type as int %d: %d\n\n",i,types[i]);
+						}
+					}
+				}
+			}
+		}
+	}
+	
+	//fprintf(fp,"Number of parameters: %d\n",size);
+	//fclose(fp);
+	
+	// Clean up
+	Py_DECREF(pFunc);
+	
+	// Finish the Python Interpreter
+	Py_Finalize();
+	
+	return size;
+}
+
+// ---------------------------------------------------------------------------------
+//		 CallPythonFunc
+// ---------------------------------------------------------------------------------
+// Returns the length of the tuple
+static float
+CallPythonFunc(
+	char *path,
+	Value *parameters )
+{
+	PyObject *pName, *pModule, *pDict, *pFunc, *pValue, *pArgs, *retValues;
+	int i, size;
+	float ret;
+	
+	// Initialize the python interpreter
+	Py_Initialize();
+	
+	// Make sure we are getting the module from the correct place
+	PyRun_SimpleString("import sys");
+	PyRun_SimpleString(path);
+	
+	// Build the name object
+	pName = PyString_FromString(gFile);
+	if (pName != NULL)
+	{
+		// Load the module object
+		pModule = PyImport_Import(pName);
+		Py_DECREF(pName);
+		if (pModule != NULL)
+		{
+			// pDict is a borrowed reference
+			pDict = PyModule_GetDict(pModule);
+			Py_DECREF(pModule);
+			if (pDict != NULL)
+			{
+				// pFunc is a borrowed reference
+				pFunc = PyDict_GetItemString(pDict, gFunc);
+			}
+		}
+	}
+	
+	if (PyCallable_Check(pFunc))
+	{		
+		// Set the number of arguments
+		pArgs = PyTuple_New(numArgs);
+		
+		for (i=0; i<numArgs; i++)
+		{
+			int countFlt = 0;
+			int countInt = 0;
+			int countStr = 0;
+			if (paramTypes[i] == "flt")
+			{
+				double temp = (double)parametersFlt[countFlt];			
+				pValue = PyFloat_FromDouble(temp);
+				PyTuple_SetItem(pArgs,i,pValue);
+				countFlt++;
+				
+				/*
+				 pValue = PyFloat_FromDouble(parameters[i]);
+				 PyTuple_SetItem(pArgs,i,pValue);
+				 */
+			}
+			else if (paramTypes[i] == "int")
+			{
+				long temp = (long)parametersInt[countInt];			
+				pValue = PyInt_FromLong(temp);
+				PyTuple_SetItem(pArgs,i,pValue);
+				countInt++;
+				
+				/*
+				 pValue = PyInt_FromLong(parameters[i]);
+				 PyTuple_SetItem(pArgs,i,pValue);
+				 */
+			}
+			else
+			{
+				const char *temp = parametersStr[countStr];			
+				pValue = PyString_FromString(temp);
+				PyTuple_SetItem(pArgs,i,pValue);
+				countStr++;
+				
+				/*
+				 pValue = PyString_FromString(parameters[i]);
+				 PyTuple_SetItem(pArgs,i,pValue);
+				 */
+			}
+		}
+		
+		// Make the call to the function
+		pValue = PyObject_CallObject(pFunc, pArgs);
+		
+		// Check for a return value and if its a tuple
+		if (pValue != NULL && PyTuple_Check(pValue))
+		{
+			// get the number arguments
+			size = (int)PyObject_Size(pValue);
+			
+			//allocate memory for strings and types
+			paramNames = (char**)malloc(size*sizeof(char));
+			
+			for ( i=0; i<size; i++)
+			{
+				//grab the list of parameters
+				PyObject *item = PyTuple_GetItem(pValue,i);
+				
+				item;
+			}
+		}
+		
+		// Set return value
+		ret = (float)PyFloat_AsDouble(pValue);
+		
+		// Clean up
+		Py_DECREF(pArgs);
+		Py_DECREF(pValue);
+	}
+	
+	// Clean up
+	Py_DECREF(pFunc);
+	
+	// Finish the Python Interpreter
+	Py_Finalize();
+	
+	return size;
 }
 	
 // ---------------------------------------------------------------------------------
@@ -480,97 +768,261 @@ HandlePropertyChangeValue(
 	// to this switch statement, to process the messages for your
 	// input properties
 	
-	// The value comes to you encapsulated in a Value structure. See 
-	// ValueCommon.h for details about the contents of this structure.
+	//FILE *f;
+	//f=fopen("/Users/danelson/Desktop/test.txt", "w");
+	//fprintf(f,"inPropertyIndex1: %d\n", inPropertyIndex1);
+	
+	Value outputValue;
+	outputValue.type = kFloat;
 	
 	switch (inPropertyIndex1) {
-	case kInputVideoIn:
-		{
-			// if bypass is off, then we store the incoming video frame reference
-			// into our image buffer -- it will be processed when our ReceiveMessage
-			// function next receives a kWantVideoFrameTick message
-			if (info->mBypass == false) {
-				SetImageBufferValue(ip, &info->mImageBufferMap, 0, GetDataValueOfType(inNewValue, kImageBufferDataType, ImageBufferPtr));
-				// set mNeedsDraw flag to ensure that new video image is drawn
-				info->mNeedsDraw |= true;
 			
-			// if bypass is on, we simply send the incoming video frame reference
-			// on to the output -- bypassing all processing entirely.
-			} else {
-				SetOutputPropertyValue_(ip, inActorInfo, kOutputVideo, inNewValue);
+		case kInputPath:
+			if (info->mPath !=NULL)
+			{
+				free(info->mPath);
+				info->mPath = NULL;
 			}
-		}
-		break;
-	
-	// ### The red, green and blue inputs are all processed in the same way:
-	// the floating point value is in the u.fvalue member of the Value struct
-	// pointed to by inNewValue. Because the min and max values specfieid in
-	// the Property Definition string was -100 to +100, the resulting value
-	// here is -1.0 to +1.0.
-	
-	case kInputRed:
-		{
-			// set new red amount, as value between 0.0 and 1.0
-			info->mRedAmount = (float)(inNewValue->u.fvalue / 100.0);
-			// set mNeedsDraw flag to ensure that new video image is drawn
-			info->mNeedsDraw = true;
-		}
-		break;
-	
-	case kInputGreen:
-		{
-			// set new green amount, as value between 0.0 and 1.0
-			info->mGreenAmount = (float)(inNewValue->u.fvalue / 100.0);
-			// set mNeedsDraw flag to ensure that new video image is drawn
-			info->mNeedsDraw = true;
-		}
-		break;
-	
-	case kInputBlue:
-		{
-			// set new blue amount, as value between 0.0 and 1.0
-			info->mBlueAmount = (float)(inNewValue->u.fvalue / 100.0);
-			// set mNeedsDraw flag to ensure that new video image is drawn
-			info->mNeedsDraw = true;
-		}
-		break;
-	
-	// When the bypass input property is set to 0 (off = default) this
-	// actor processes the video normally. When it is set to 1 (on) all
-	// processing is bypassed and the input video is passed directly
-	// to the output.
-	case kInputBypass:
-		// store member variable for on/off
-		info->mBypass = (inNewValue->u.ivalue != 0);
-		
-		// if "bypass" is going from on to off, we need to
-		// reallocate our message receiver so that we will
-		// start receiving video frame tick messages again
-		if (info->mBypass == false) {
-			if (info->mMessageReceiver == nil) {
-				info->mMessageReceiver = CreateActorMessageReceiver_(
-					ip,
-					inActorInfo,
-					ReceiveMessage,
-					0,
-					kWantVideoFrameTick,
-					(long) inActorInfo);
+			if (info->mPath == NULL && inNewValue->u.str != NULL)
+			{
+				info->mPath = static_cast<char*>(malloc(strlen(inNewValue->u.str->strData)+1));
+				strcpy(info->mPath, inNewValue->u.str->strData);
+				isPath = true;
+				gPath = info->mPath;
 			}
+			break;
 			
-		// if "bypass" is going from off to on, then we want to
-		// stop processing video. We dispose our message receiver
-		// here to save processing power -- when bypass is "on" the
-		// incoming video is sent directly to the output -- see the
-		// case kInputVideoIn above.
-		} else {
-			if (info->mMessageReceiver != nil) {
-				DisposeMessageReceiver_(ip, info->mMessageReceiver);
-				info->mMessageReceiver = nil;
-				info->mNeedsDraw |= true;
+		case kInputFile:
+			if (info->mFile !=NULL)
+			{
+				free(info->mFile);
+				info->mFile = NULL;
 			}
+			if (info->mFile == NULL && inNewValue->u.str  != NULL)
+			{
+				info->mFile = static_cast<char*>(malloc(strlen(inNewValue->u.str->strData)+1));
+				strcpy(info->mFile, inNewValue->u.str->strData);
+				isFile = true;
+				gFile = info->mFile;
+			}
+			break;
+			
+		case kInputFunc:
+			if (info->mFunc !=NULL)
+			{
+				free(info->mFunc);
+				info->mFunc = NULL;
+			}
+			if (info->mFunc == NULL && inNewValue->u.str  != NULL)
+			{
+				info->mFunc = static_cast<char*>(malloc(strlen(inNewValue->u.str->strData)+1));
+				strcpy(info->mFunc, inNewValue->u.str->strData);
+				isFunc = true;
+				gFunc = info->mFunc;
+			}
+			break;
+			
+		case kInputParams:
+		{
+			info->mParams = inNewValue->u.ivalue;
+			
+			if ( info->mParams == 1 )
+			{
+				// Get the full path name and find the number of parameters
+				char *first = "sys.path.append(\"";
+				char *last = "\")";
+				buffer = (char*)malloc( strlen(first)+strlen(gPath)+strlen(last) + 2 );
+				sprintf(buffer, "%s%s%s", first, gPath, last);
+				numArgs = FindPythonFunc(buffer);
+				int delta = numArgs;
+				
+				// Output the number of params
+				Value v;
+				v.type = kFloat;
+				v.u.fvalue = numArgs;
+				SetOutputPropertyValue_(ip, info->mActorInfoPtr, kOutput, &v);
+				
+				// Dynamically change inputs of actor
+				UInt32 propCount;
+				IzzyError err = GetPropertyCount_(ip, inActorInfo, kInputProperty, &propCount);
+				PluginAssert_(ip, err == kIzzyNoError && propCount >= 1);
+				
+				UInt32 changeableOutputCount = propCount;
+				
+				int count = 0;
+				if (delta > 0)
+				{					
+					// get min and max value from the current value input property
+					Value valueMin;
+					Value valueMax;
+					Value valueInit;
+					// get current property display format
+					PropertyDispFormat availFmts;
+					PropertyDispFormat curFmt;
+					
+					while (delta-- > 0)
+					{
+						// Here we have to check to see what type the input is
+						if (types[count] == 0)
+						{
+							//fprintf(f, "Str\n");
+							
+							valueInit.type = kString;
+							AllocateValueString_(ip, "", &valueInit);
+							
+							GetPropertyMinMax_(ip, inActorInfo, kInputProperty, kInputPath, &valueMin, &valueMax, NULL);
+							availFmts = kDisplayFormatText;
+							curFmt = kDisplayFormatText;
+						}
+						else if (types[count] == 1)
+						{
+							//fprintf(f, "Int\n");
+							
+							valueMin.type = kInteger;
+							valueMin.u.ivalue = -2147483647;
+							valueMax.type = kInteger;
+							valueMax.u.ivalue = 2147483647;
+							valueInit.type = kInteger;
+							valueInit.u.ivalue = 0;
+							availFmts = kDisplayFormatNumber;
+							curFmt = kDisplayFormatNumber;
+						}
+						else if (types[count] == 2)
+						{
+							//fprintf(f, "Float\n");
+							
+							valueMin.type = kFloat;
+							valueMin.u.fvalue = -2147483647;
+							valueMax.type = kFloat;
+							valueMax.u.fvalue = 2147483647;
+							valueInit.type = kFloat;
+							valueInit.u.fvalue = 0;
+							availFmts = kDisplayFormatNumber;
+							curFmt = kDisplayFormatNumber;
+						}
+						
+						int index = changeableOutputCount + 1;
+						
+						//fprintf(f, "index %d\n", index);
+						
+						char propertyName[256];
+						// Here we get the input names from the paramNames array
+						// index - number of params + 1
+						sprintf(propertyName, "%s", paramNames[index-7]);
+						
+						OSType rateType = CreatePropertyID(ip, "in", index);
+						
+						PropIDT code = CreatePropertyID(ip, "in", index);
+						
+						err = AddProperty_(ip, inActorInfo,
+										   kInputProperty,
+										   rateType,					// the input type
+										   FOUR_CHAR_CODE(code),		// the input to which we will conform
+										   propertyName,
+										   availFmts,
+										   curFmt,
+										   1,
+										   &valueMin,
+										   &valueMax,
+										   &valueInit);
+						PluginAssert_(ip, err == noErr);
+						
+						CopyPropDefValueSource_(ip, inActorInfo, kInputProperty, 1, kInputProperty, index);
+						
+						changeableOutputCount++;
+						count++;
+					}
+					
+					if (valueInit.type == kString)
+					{
+						ReleaseValueString_(ip, &valueInit);
+					}
+				}
+			}
+			else
+			{
+				UInt32 propCount;
+				IzzyError err = GetPropertyCount_(ip, inActorInfo, kInputProperty, &propCount);
+				
+				// Remove unwanted params
+				if (numArgs > 0)
+				{
+					int index = 6 + numArgs;
+					for (i=0; i<numArgs; i++)
+					{
+						err = RemovePropertyProc_(ip, inActorInfo, kInputProperty, index);
+						PluginAssert_(ip, err == noErr);
+						index--;
+					}
+				}
+			}
+			break;
 		}
-		break;
+			
+		case kInputOutputs:
+		{
+			info->mOutputs = inNewValue->u.fvalue;
+			break;
+		}
+			
+		case kInputTest:
+		{
+			info->mTest = inNewValue->u.fvalue;
+			//fprintf(f,"hi\n");
+			break;
+		}
+		case kInput00:
+		{
+			//fprintf(f, "python 1\n");
+			info->mI0 = inNewValue->u.ivalue;
+			break;
+		}
+		case kInput01:
+		{
+			//fprintf(f, "python 2\n");
+			info->mI1 = inNewValue->u.ivalue;
+			break;
+		}
+		default:
+		{
+			//fprintf(f, "default\n");
+		}
 	}
+	
+	//fclose(f);
+}
+
+// ---------------------------------------------------------------------------------
+//		? PropertyValueToString
+// ---------------------------------------------------------------------------------
+//	Converts PROPDEF parameters into more meaningful strings
+
+static Boolean PropValueCheck(IsadoraParameters* &ip, ValuePtr &inValue, char* &outString, UInt8 maxValues, char** sList){
+	if (inValue->u.ivalue >= 0 && inValue->u.ivalue <= maxValues-1) {
+		strcpy(outString, sList[inValue->u.ivalue]);
+	} else {
+		PluginAssert_(ip, false);
+	}
+	return true;
+}
+
+// ---------------------------------------------------------------------------------
+//		? PropertyStringToValue
+// ---------------------------------------------------------------------------------
+static Boolean PropStringCheck(IsadoraParameters* &ip, const char* &inString, ValuePtr &outValue, UInt8 maxValues, char** sList){
+	if (strlen(inString) == 1 && inString[0] >= '0' && inString[0] <= maxValues-1+'0') {
+		outValue->type = kInteger;
+		outValue->u.ivalue = (SInt32) inString[0] - '0';
+		return true;
+	} else {
+		SInt32 matchIndex = LookupPartialStringInList_(ip, maxValues, sList, inString);
+		if (matchIndex >= 0) {
+			outValue->type = kInteger;
+			outValue->u.ivalue = matchIndex;
+			return true;
+		}
+	}
+	return false;
 }
 
 
@@ -668,208 +1120,8 @@ GetActorInfo(
 	outActorParams->mHandlePropertyChangeValueProc		= HandlePropertyChangeValue;
 	
 	// OPTIONAL FUNCTIONS
-	outActorParams->mHandlePropertyChangeTypeProc		= NULL;
 	outActorParams->mHandlePropertyConnectProc			= NULL;
-	outActorParams->mPropertyValueToStringProc			= NULL;
-	outActorParams->mPropertyStringToValueProc			= NULL;
 	outActorParams->mGetActorDefinedAreaProc			= GetActorDefinedArea;
 	outActorParams->mDrawActorDefinedAreaProc			= DrawActorDefinedArea;
 	outActorParams->mMouseTrackInActorDefinedAreaProc	= NULL;
-}
-
-// ---------------------------------------------------------------------------------
-//		¥ ProcessVideoFrame
-// ---------------------------------------------------------------------------------
-//	### This is the code that does the actual processing of a video frame. Modify
-// this code to create your own filter.
-//
-
-static void
-ProcessVideoFrame(
-	IsadoraParameters*	/* ip */,	// not used in this function, but needed to call PluginAssert_
-	PluginInfo*			info,
-	ImageBufferPtr		srcBuf,
-	ImageBufferPtr		outBuf)
-{
-	UInt32* srcData = static_cast<UInt32*>(srcBuf->mBaseAddress);
-	UInt32 srcStride = srcBuf->mRowBytes - srcBuf->mWidth * sizeof(UInt32);
-
-	UInt32* outData = static_cast<UInt32*>(outBuf->mBaseAddress);
-	UInt32 outStride = outBuf->mRowBytes - outBuf->mWidth * sizeof(UInt32);
-	
-	// ### this is where your video processing code would go
-	// here, we are increasing or decreasing the red, green,
-	// and blue components of the video image.
-	SInt16 redFactor = static_cast<SInt16>(256.0 * info->mRedAmount);
-	SInt16 greenFactor = static_cast<SInt16>(256.0 * info->mGreenAmount);
-	SInt16 blueFactor = static_cast<SInt16>(256.0 * info->mBlueAmount);
-	
-	// for each row
-	SInt16 row = 0;
-	while (row < outBuf->mHeight) {
-		
-		// and for each column in that row
-		SInt16 col = 0;
-		while (col < outBuf->mWidth) {
-		
-			// IMRORTANT: For Mac/Windows cross-platform compatbility,
-			// make sure to use the RED_, GREEN_ and BLUE_ macros to
-			// extract pixels from a the raw data, and use RGB_ to 
-			// combine them back.
-			//
-			// On the Mac, the pixels are arranged 00RRGGBB with
-			// the blue in the low 8 bits.
-			// Under Quicktime for Windows, the data is arranged
-			// BBGGRR00 - in reverse order. Using the macros is
-			// a easy way to ensure your code will operate on 
-			// both platforms.
-			//
-			
-			SInt16 red = RED_(*srcData);
-			SInt16 green = GREEN_(*srcData);
-			SInt16 blue = BLUE_(*srcData);
-			
-			// adjust the colors
-			red += (red * redFactor) / 256;
-			if (red < 0)
-				red = 0;
-			else if (red > 255)
-				red = 255;
-			
-			green += (green * greenFactor) / 256;
-			if (green < 0)
-				green = 0;
-			else if (green > 255)
-				green = 255;
-			
-			blue += (blue * blueFactor) / 256;
-			if (blue < 0)
-				blue = 0;
-			else if (blue > 255)
-				blue = 255;
-
-			*(outData) = ARGB_(255, red, green, blue);
-			
-			// increment src and out pixel
-			srcData++;
-			outData++;
-			
-			// increment column count
-			col++;
-		}
-
-		// skip to the next line of video, using the
-		// stride values computed above
-		srcData = (UInt32*)((char*) srcData + srcStride);
-		outData = (UInt32*)((char*) outData + outStride);
-		
-		// increment row count
-		row++;
-	}
-}
-
-// ---------------------------------------------------------------------------------
-//		¥ ReceiveMessage
-// ---------------------------------------------------------------------------------
-//	Isadora broadcasts messages to its Message Receives depending on what message
-//	they are listening to. In this case, we are listening for kWantVideoFrameTick,
-//	which is broadcast periodically (30 times per second.) When we receive the
-//	message, we check to see if our video frame needs to be updated. If so, we
-//	process the incoming video and pass the newly generated frame to the output.
-
-static void
-ReceiveMessage(
-	IsadoraParameters*	ip,
-	MessageMask			/* inMessageMask */,		// the message that caused this ReceiveMessage to be called -- one of the kWant... constants
-	PortIndex			/* inIndex1 */,				// for MIDI messages, the port from which the message arrived. n/a otherwise
-	const MsgData*		/* inData */,				// the data associated with this message
-	UInt32				/* inLen */,				// the length of the data associated with this message
-	long				inRefCon)					// in our use, actually the pointer to our ActorInfo
-{
-	// Convert the refCon into the ActorInfo* that it
-	// really is, so that we can get at our data
-	ActorInfo* actorInfo = reinterpret_cast<ActorInfo*>(inRefCon);
-
-	// get pointer to plugin info
-	PluginInfo* info = GetPluginInfo_(actorInfo);
-
-	// We use this Value struct in a few places below...
-	Value v = { kData, nil };
-
-	// set a flag to remember if we had an output buffer before we
-	// called UpdateImageBufferMap
-	Boolean wasOutputBuffer = info->mImageBufferMap.mOutputBuffersValid;
-	
-	// ensure that the ImageBufferMap is up valid for the
-	// current input Image Buffer
-	UpdateImageBufferMap(ip, &info->mImageBufferMap);
-	
-	// use GetImageBufferPtr to get the input and output buffers
-	ImageBufferPtr img1 = GetImageBufferPtr(ip, &info->mImageBufferMap, 0);
-	ImageBufferPtr out = GetOutputImageBufferPtr(&info->mImageBufferMap, 0);
-
-	// if we don't have a valid output buffer
-
-	if (info->mImageBufferMap.mOutputBuffersValid == false) {
-		
-		// if there was an output buffer preivously, we need to 
-		// send a 'nil' buffer to let other modules know that 
-		// our ouptut is now invalid
-		if (wasOutputBuffer) {
-			v.u.data = nil;
-			SetOutputPropertyValue_(ip, actorInfo, kOutputVideo, &v);
-		}
-
-	// otherwise, if our mNeedsDraw flag is true, and if we have both
-	// and input buffer and an output buffer, then we can proceed to 
-	// process the video image
-	// 
-	// we only draw the image if the following are true:
-	// 1) the mNeedsDraw variable is set to true (this is set in the
-	//    InputPropertyChangeValue callback above.)
-	// 2) the input image buffer (img1) is not nil
-	// 3) the output image buffer (out) is not nil
-	
-	} else if (info->mNeedsDraw && img1 != nil && out != nil) {
-
-		// call EnterVideoProcessing_ so that Isadora will accumulate the
-		// amount of time spent processing the video data - this is not
-		// requried by highly recommended so that the VPO value in the
-		// Status Window stays accurate.
-		UInt64 vpStart = EnterVideoProcessing_(ip);
-		
-		// clear the mNeedsDraw flag
-		info->mNeedsDraw = false;
-	
-		// assume for the moment that we won't draw the frame
-		// set this value to true if we change the output
-		Boolean drawFrame = false;
-		
-		// we only process 32 bit data in this plugin
-		if (out->mBitDepth == 32) {
-			ProcessVideoFrame(ip, info, img1, out);
-			drawFrame = true;
-		}
-		
-		// if the drawFrame flag got set, then we need to output the
-		// new video data to our output port here.
-		
-		if (drawFrame) {
-			
-			// IMPORTANT: We have changed the data in the output buffer
-			// so we need to increment the data change count so that
-			// those looking at our data will know that there is new
-			// data in the buffer
-			
-			out->mInfo.mDataChangeCount++;
-			v.u.data = out;
-			
-			// send the new video frame to the video output property
-			SetOutputPropertyValue_(ip, info->mActorInfoPtr, kOutputVideo, &v);
-		}
-		
-		// make sure to compliment EnterVideoProcessing_ with 
-		// and ExitVideoProcessing_ call
-		ExitVideoProcessing_(ip, vpStart);
-	}
 }
