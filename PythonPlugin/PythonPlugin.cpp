@@ -170,9 +170,6 @@ typedef struct {
 	char*				mFunc;
 	Boolean				mParams;
 	Boolean				mOutputs;
-	float				mTest;
-	int					mI0;
-	int					mI1;
 } PluginInfo;
 
 // A handy macro for casting the mActorDataPtr to PluginInfo*
@@ -224,12 +221,11 @@ static const char* sPropertyDefinitionString =
 
 // INPUT PROPERTY DEFINITIONS
 //	TYPE 	PROPERTY NAME	ID		DATATYPE	DISPLAY FMT			MIN		MAX		INIT VALUE
-	"INPROP		input		path	string		text				*		*		\r"
-	"INPROP		input		file	string		text				*		*		\r"
-	"INPROP		input		func	string		text				*		*		\r"
+	"INPROP		path		path	string		text				*		*		\r"
+	"INPROP		file		file	string		text				*		*		\r"
+	"INPROP		func		func	string		text				*		*		\r"
 	"INPROP 	params		parm	bool		onoff				0		1		0\r"
 	"INPROP		outputs		oupt	bool		onoff				0		1		0\r"
-	"INPROP		testing		test	float		number				*		*		0\r"
 
 // OUTPUT PROPERTY DEFINITIONS
 //	TYPE 	 PROPERTY NAME	ID		DATATYPE	DISPLAY FMT			MIN		MAX		INIT VALUE
@@ -248,9 +244,6 @@ enum
 	kInputFunc,
 	kInputParams,
 	kInputOutputs,
-	kInputTest,
-	kInput00 = 7,
-	kInput01 = 8,
 	
 	kOutput
 };
@@ -964,25 +957,7 @@ HandlePropertyChangeValue(
 			info->mOutputs = inNewValue->u.fvalue;
 			break;
 		}
-			
-		case kInputTest:
-		{
-			info->mTest = inNewValue->u.fvalue;
-			//fprintf(f,"hi\n");
-			break;
-		}
-		case kInput00:
-		{
-			//fprintf(f, "python 1\n");
-			info->mI0 = inNewValue->u.ivalue;
-			break;
-		}
-		case kInput01:
-		{
-			//fprintf(f, "python 2\n");
-			info->mI1 = inNewValue->u.ivalue;
-			break;
-		}
+
 		default:
 		{
 			//fprintf(f, "default\n");
