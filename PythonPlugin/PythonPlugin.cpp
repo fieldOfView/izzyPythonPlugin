@@ -491,8 +491,8 @@ static int
 FindPythonFunc(
 	char *path)
 {	
-	PyObject *pName, *pModule, *pDict, *pFunc, *pInspect, *argspec_tuple, *arglist;
-	int size, i;
+	PyObject *pName, *pModule, *pDict, *pFunc = NULL, *pInspect, *argspec_tuple, *arglist;
+	int size = 0, i;
 	
 	//FILE *fp;
 	//fp=fopen("/Users/danelson/Desktop/params.txt", "w");
@@ -605,7 +605,7 @@ FindPythonFunc(
 	//fclose(fp);
 	
 	// Clean up
-	Py_DECREF(pFunc);
+	if(pFunc != NULL) Py_DECREF(pFunc);
 	
 	// Finish the Python Interpreter
 	Py_Finalize();
@@ -622,8 +622,8 @@ CallPythonFunc(
 	char *path,
 	Value *parameters )
 {
-	PyObject *pName, *pModule, *pDict, *pFunc, *pValue, *pArgs, *retValues;
-	int i, size;
+	PyObject *pName, *pModule, *pDict, *pFunc = NULL, *pValue, *pArgs, *retValues;
+	int i, size = 0;
 	float ret;
 	
 	// Initialize the python interpreter
@@ -731,7 +731,7 @@ CallPythonFunc(
 	}
 	
 	// Clean up
-	Py_DECREF(pFunc);
+	if(pFunc != NULL) Py_DECREF(pFunc);
 	
 	// Finish the Python Interpreter
 	Py_Finalize();
