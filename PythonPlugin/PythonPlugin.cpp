@@ -1,6 +1,8 @@
 // ===========================================================================
-//	Isadora Demo Plugin			   ©2003 Mark F. Coniglio. All rights reserved.
+//	Isadora Python Plugin		  ©2003 Mark F. Coniglio. All rights reserved.
 // ===========================================================================
+//
+//  Based on ExecutePythonFunction.cpp ©2003 Mark F. Coniglio.
 //
 //	IMPORTANT: This source code ("the software") is supplied to you in
 //	consideration of your agreement to the following terms. If you do not
@@ -56,6 +58,10 @@
 // STANDARD INCLUDES
 #include <string.h>
 #include <stdio.h>
+#include <stdlib.h>
+#include <float.h>
+
+#include <Python.h>
 
 // ---------------------------------------------------------------------------------
 // MacOS Specific
