@@ -1,0 +1,41 @@
+// Generated Resource Script for the PythonPlugin Isadora Plugin
+
+#include "resource.h"
+#include "windows.h"
+
+// add your resource statements here
+
+/****************/
+/* Version Info */
+/****************/
+
+VS_VERSION_INFO VERSIONINFO
+	FILEVERSION		1,0,0,0
+	PRODUCTVERSION	1,0,0,0
+	FILEFLAGSMASK	0x3fL
+	FILEFLAGS		0
+	FILEOS			VOS__WINDOWS32
+	FILETYPE		VFT_DLL
+	FILESUBTYPE		0x0L
+{
+	BLOCK "StringFileInfo"
+	{
+		BLOCK "080904E4"
+		{
+			VALUE "CompanyName", "CompanyName\000"
+			VALUE "FileDescription", "PythonPlugin\000"
+			VALUE "FileVersion", "1.0.0.0\000"
+			VALUE "InternalName", "PythonPlugin.dll\000"
+			VALUE "LegalCopyright", "\251CompanyName\000"
+			VALUE "LegalTrademarks", "CompanyName\256\000"
+			VALUE "OriginalFilename", "PythonPlugin.exe\000"
+			VALUE "ProductName", "PythonPlugin 1.00\000"
+			VALUE "ProductVersion", "1.0.0.0\000"
+			VALUE "Comments", "by AuthorName\000"
+		}
+	}
+	BLOCK "VarFileInfo"
+	{
+		VALUE "Translation", 2057, 1252
+	}
+}
