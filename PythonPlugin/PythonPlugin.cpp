@@ -244,8 +244,9 @@ enum
 	kInputFunc,
 	kInputParams,
 	kInputOutputs,
+	kFirstArg,
 	
-	kOutput
+	kOutput = 255
 };
 
 
@@ -274,10 +275,11 @@ const char* sHelpStrings[] =
 	
 	"Specifices a python function within the selected module.",
 	
-	"Determines the behaviour when changing 'select':\r"
-	"- <normal> operates just like the 'Router' actor\r"
-	"- <clear> sets the value of the output to 0 when a new output is selected\r"
-	"- <restore> returns the output to its original value when a new output is selected (unless 'in' changes while the output is selected)",
+	"If set to on, the python properties are added for function arguments",
+	
+	"If set to on, the output of the function is propagated to the Ouput property",
+	
+	"",
 	
 	"Outputs data arriving at the 'value' input when the 'select' input specifies this output. "
 	"Note that this input is mutable: it, the other outputs, and the 'in' input will "
@@ -408,18 +410,22 @@ GetHelpString(
 	const char* helpstr = nil;
 	// if the input the user is asking about is
 	// past the end of the fixed properties, then
-	// we force it to the first fixed property
-	if (inPropertyType == kOutputProperty) {
-		//if (inPropertyIndex1 >= kFirstVariablePropertyIndex1) {
-		//	inPropertyIndex1 = kFirstVariablePropertyIndex1;
-		//}
-	}
+	// we force it to the first variable property
+	if (inPropertyType == kInputProperty) {
+		if (inPropertyIndex1 >= kFirstArg) {
+			inPropertyIndex1 = kFirstArg;
+		}
+	} 
 	
 	// The PropertyTypeAndIndexToHelpIndex_ converts the inPropertyType and
 	// inPropertyIndex1 parameters to determine the zero-based index into
 	// your list of help strings.
 	UInt32 index1 = PropertyTypeAndIndexToHelpIndex_(ip, inActorInfo, inPropertyType, inPropertyIndex1);
 	
+	if (inPropertyType == kOutputProperty) {
+		index1 = kFirstArg+1;
+	}
+
 	// get the help string
 	helpstr = sHelpStrings[index1];
 	
@@ -901,7 +907,7 @@ HandlePropertyChangeValue(
 						char propertyName[256];
 						// Here we get the input names from the paramNames array
 						// index - number of params + 1
-						sprintf(propertyName, "%s", paramNames[index-7]);
+						sprintf(propertyName, "%s", paramNames[index-(kFirstArg)]);
 						
 						OSType rateType = CreatePropertyID(ip, "in", index);
 						
@@ -940,7 +946,7 @@ HandlePropertyChangeValue(
 				// Remove unwanted params
 				if (numArgs > 0)
 				{
-					int index = 6 + numArgs;
+					int index = (kFirstArg-1) + numArgs;
 					for (i=0; i<numArgs; i++)
 					{
 						err = RemovePropertyProc_(ip, inActorInfo, kInputProperty, index);
