@@ -225,6 +225,7 @@ static const char* sPropertyDefinitionString =
 
 // INPUT PROPERTY DEFINITIONS
 //	TYPE 	PROPERTY NAME	ID		DATATYPE	DISPLAY FMT			MIN		MAX		INIT VALUE
+	"INPROP		trigger			trig	bool		trig				0		1		0\r"
 	"INPROP		path			path	string		text				*		*		\r"
 	"INPROP		module			file	string		text				*		*		\r"
 	"INPROP		function		func	string		text				*		*		\r"
@@ -233,8 +234,8 @@ static const char* sPropertyDefinitionString =
 // OUTPUT PROPERTY DEFINITIONS
 //	TYPE 	 PROPERTY NAME	ID		DATATYPE	DISPLAY FMT			MIN		MAX		INIT VALUE
 	"OUTPROP 	function_found	parm	bool		onoff				0		1		0\r"
-	"OUTPROP	output			out		string		text				*		*		\r"
-	"OUTPROP	error			err		string		text				*		*		\r";
+	"OUTPROP	error			err		string		text				*		*		\r"
+	"OUTPROP	output			out		string		text				*		*		\r";
 
 // ### Property Index Constants
 // Properties are referenced by a one-based index. The first input property will
@@ -244,15 +245,16 @@ static const char* sPropertyDefinitionString =
 
 enum
 {
-	kInputPath = 1,
+	kInputTrigger = 1,
+	kInputPath,
 	kInputFile,
 	kInputFunc,
 	kInputParams,
 	kInputArg0,
 	
 	kOutputFuncFound = 1,
-	kOutputResult,
-	kOutputError
+	kOutputError,
+	kOutputResult
 };
 
 
@@ -275,6 +277,8 @@ const char* sHelpStrings[] =
 {
 	"Finds a python function and performs the operation.",
 	
+	"Triggers execution of the function, if the function can be found.",
+
 	"Specifies the directory of the python module. Can be left blank if the module is in the PYHTONPATH.",
 	
 	"Specifies a python module within the selected directory or within PYTHONPATH.",
@@ -288,10 +292,10 @@ const char* sHelpStrings[] =
 
 	"Set to 'on' if the specified python function was found.",
 	
+	"Outputs any error string returned by the python function. "
+
 	"Outputs data returned by the python function. "
 	"Note that this input is mutable: it changes its type to match the input property to which it is linked.",
-
-	"Outputs any error string returned by the python function. "
 };
 
 // * User Constants
@@ -778,7 +782,14 @@ HandlePropertyChangeValue(
 	outputValue.type = kFloat;
 	
 	switch (inPropertyIndex1) {
-			
+		
+		case kInputTrigger:
+			if (funcFound)
+			{
+				// TODO: call function
+			}
+			break;
+		
 		case kInputPath:
 			if (info->mPath !=NULL)
 			{
