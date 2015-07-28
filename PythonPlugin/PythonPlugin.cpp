@@ -135,6 +135,7 @@ Boolean isPath = false;
 Boolean isFile = false;
 Boolean isFunc = false;
 int numArgs = 0;
+bool funcFound = false;
 
 // For the file path
 char *gPath; 
@@ -169,6 +170,10 @@ typedef struct {
 	char*				mFile;
 	char*				mFunc;
 	Boolean				mParams;
+	
+	Boolean				mFunctionFound;
+	char*				mOut;
+	char*				mErr;
 } PluginInfo;
 
 // A handy macro for casting the mActorDataPtr to PluginInfo*
@@ -220,14 +225,16 @@ static const char* sPropertyDefinitionString =
 
 // INPUT PROPERTY DEFINITIONS
 //	TYPE 	PROPERTY NAME	ID		DATATYPE	DISPLAY FMT			MIN		MAX		INIT VALUE
-	"INPROP		path		path	string		text				*		*		\r"
-	"INPROP		file		file	string		text				*		*		\r"
-	"INPROP		func		func	string		text				*		*		\r"
-	"INPROP 	params		parm	bool		onoff				0		1		0\r"
+	"INPROP		path			path	string		text				*		*		\r"
+	"INPROP		module			file	string		text				*		*		\r"
+	"INPROP		function		func	string		text				*		*		\r"
+	"INPROP		params			parm	bool		onoff				0		1		0\r"
 
 // OUTPUT PROPERTY DEFINITIONS
 //	TYPE 	 PROPERTY NAME	ID		DATATYPE	DISPLAY FMT			MIN		MAX		INIT VALUE
-	"OUTPROP	output		out		float		number				*		*		0\r";
+	"OUTPROP 	function_found	parm	bool		onoff				0		1		0\r"
+	"OUTPROP	output			out		string		text				*		*		\r"
+	"OUTPROP	error			err		string		text				*		*		\r";
 
 // ### Property Index Constants
 // Properties are referenced by a one-based index. The first input property will
@@ -241,9 +248,11 @@ enum
 	kInputFile,
 	kInputFunc,
 	kInputParams,
-	kFirstArg,
+	kInputArg0,
 	
-	kOutput = 240
+	kOutputFuncFound,
+	kOutputResult,
+	kOutputError
 };
 
 
@@ -266,19 +275,23 @@ const char* sHelpStrings[] =
 {
 	"Finds a python function and performs the operation.",
 	
-	"Specifies the directory.",
+	"Specifies the directory of the python module. Can be left blank if the module is in the PYHTONPATH.",
 	
-	"Specifices a python module within the selected directory.",
+	"Specifies a python module within the selected directory or within PYTHONPATH.",
 	
-	"Specifices a python function within the selected module.",
+	"Specifies a python function within the selected module.",
 	
-	"If set to on, the python properties are added for function arguments",
+	"If set to 'on', the python properties are added for function arguments.",
 	
-	"",
+	"Argument for the python function. "
+	"Note that this input is mutable: it changes its type to match the output property to which it is linked.",
+
+	"Set to 'on' if the specified python function was found.",
 	
-	"Outputs data arriving at the 'value' input when the 'select' input specifies this output. "
-	"Note that this input is mutable: it, the other outputs, and the 'in' input will "
-	"change their type to match the input property to which it is linked."
+	"Outputs data returned by the python function. "
+	"Note that this input is mutable: it changes its type to match the input property to which it is linked.",
+
+	"Outputs any error string returned by the python function. "
 };
 
 // * User Constants
@@ -407,8 +420,8 @@ GetHelpString(
 	// past the end of the fixed properties, then
 	// we force it to the first variable property
 	if (inPropertyType == kInputProperty) {
-		if (inPropertyIndex1 >= kFirstArg) {
-			inPropertyIndex1 = kFirstArg;
+		if (inPropertyIndex1 >= kInputArg0) {
+			inPropertyIndex1 = kInputArg0;
 		}
 	} 
 	
@@ -418,7 +431,7 @@ GetHelpString(
 	UInt32 index1 = PropertyTypeAndIndexToHelpIndex_(ip, inActorInfo, inPropertyType, inPropertyIndex1);
 	
 	if (inPropertyType == kOutputProperty) {
-		index1 = kFirstArg+1;
+		index1 = kInputArg0+inPropertyIndex1;
 	}
 
 	// get the help string
@@ -525,6 +538,8 @@ FindPythonFunc(
 			}
 		}
 	}
+	
+	funcFound = (pFunc != NULL);
 	
 	pName = PyString_FromString("inspect");	
 	if (pName != NULL)
@@ -830,11 +845,18 @@ HandlePropertyChangeValue(
 				numArgs = FindPythonFunc(buffer);
 				int delta = numArgs;
 				
-				// Output the number of params
+				// Output a boolean showing if the function was found
+				Value fv;
+				fv.type = kBoolean;
+				fv.u.ivalue = funcFound;
+				SetOutputPropertyValue_(ip, inActorInfo, kOutputFuncFound, &fv);
+				
+				// Output test string
 				Value v;
-				v.type = kFloat;
-				v.u.fvalue = numArgs;
-				SetOutputPropertyValue_(ip, info->mActorInfoPtr, kOutput, &v);
+				v.type = kString;
+				AllocateValueString_(ip, "test", &v);
+				SetOutputPropertyValue_(ip, info->mActorInfoPtr, kOutputResult, &v);
+				ReleaseValueString_(ip, &v);
 				
 				// Dynamically change inputs of actor
 				UInt32 propCount;
@@ -902,7 +924,7 @@ HandlePropertyChangeValue(
 						char propertyName[256];
 						// Here we get the input names from the paramNames array
 						// index - number of params + 1
-						sprintf(propertyName, "%s", paramNames[index-(kFirstArg)]);
+						sprintf(propertyName, "%s", paramNames[index-kInputArg0]);
 						
 						OSType rateType = CreatePropertyID(ip, "in", index);
 						
@@ -941,7 +963,7 @@ HandlePropertyChangeValue(
 				// Remove unwanted params
 				if (numArgs > 0)
 				{
-					int index = (kFirstArg-1) + numArgs;
+					int index = (kInputArg0-1) + numArgs;
 					for (i=0; i<numArgs; i++)
 					{
 						err = RemovePropertyProc_(ip, inActorInfo, kInputProperty, index);
