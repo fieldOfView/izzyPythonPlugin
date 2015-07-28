@@ -169,7 +169,6 @@ typedef struct {
 	char*				mFile;
 	char*				mFunc;
 	Boolean				mParams;
-	Boolean				mOutputs;
 } PluginInfo;
 
 // A handy macro for casting the mActorDataPtr to PluginInfo*
@@ -225,7 +224,6 @@ static const char* sPropertyDefinitionString =
 	"INPROP		file		file	string		text				*		*		\r"
 	"INPROP		func		func	string		text				*		*		\r"
 	"INPROP 	params		parm	bool		onoff				0		1		0\r"
-	"INPROP		outputs		oupt	bool		onoff				0		1		0\r"
 
 // OUTPUT PROPERTY DEFINITIONS
 //	TYPE 	 PROPERTY NAME	ID		DATATYPE	DISPLAY FMT			MIN		MAX		INIT VALUE
@@ -243,10 +241,9 @@ enum
 	kInputFile,
 	kInputFunc,
 	kInputParams,
-	kInputOutputs,
 	kFirstArg,
 	
-	kOutput = 255
+	kOutput = 240
 };
 
 
@@ -276,8 +273,6 @@ const char* sHelpStrings[] =
 	"Specifices a python function within the selected module.",
 	
 	"If set to on, the python properties are added for function arguments",
-	
-	"If set to on, the output of the function is propagated to the Ouput property",
 	
 	"",
 	
@@ -958,12 +953,6 @@ HandlePropertyChangeValue(
 			break;
 		}
 			
-		case kInputOutputs:
-		{
-			info->mOutputs = inNewValue->u.fvalue;
-			break;
-		}
-
 		default:
 		{
 			//fprintf(f, "default\n");
