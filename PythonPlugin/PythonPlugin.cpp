@@ -119,13 +119,15 @@ EXPORT_ void GetActorInfo(void* inParam, ActorInfo* outActorParams);
 //	FORWARD DECLARTIONS
 // ---------------------------------------------------------------------------------
 static void
-ReceiveMessage(
+AddArgInputProperties(	
 	IsadoraParameters*	ip,
-	MessageMask			inMessageMask,
-	PortIndex			inPortIndex1,
-	const MsgData*		inData,
-	UInt32				inLen,
-	long				inRefCon);
+	ActorInfo*			inActorInfo);
+
+static void
+ClearArgInputProperties(	
+	IsadoraParameters*	ip,
+	ActorInfo*			inActorInfo);
+
 
 // ---------------------------------------------------------------------------------
 // GLOBAL VARIABLES
@@ -250,7 +252,7 @@ enum
 	kInputParams,
 	kInputArg0,
 	
-	kOutputFuncFound,
+	kOutputFuncFound = 1,
 	kOutputResult,
 	kOutputError
 };
@@ -780,6 +782,8 @@ HandlePropertyChangeValue(
 	//FILE *f;
 	//f=fopen("/Users/danelson/Desktop/test.txt", "w");
 	//fprintf(f,"inPropertyIndex1: %d\n", inPropertyIndex1);
+
+	bool findFunc = false;
 	
 	Value outputValue;
 	outputValue.type = kFloat;
@@ -799,6 +803,7 @@ HandlePropertyChangeValue(
 				isPath = true;
 				gPath = info->mPath;
 			}
+			findFunc = true;
 			break;
 			
 		case kInputFile:
@@ -814,6 +819,7 @@ HandlePropertyChangeValue(
 				isFile = true;
 				gFile = info->mFile;
 			}
+			findFunc = true;
 			break;
 			
 		case kInputFunc:
@@ -829,147 +835,22 @@ HandlePropertyChangeValue(
 				isFunc = true;
 				gFunc = info->mFunc;
 			}
+			findFunc = true;
 			break;
 			
 		case kInputParams:
 		{
 			info->mParams = inNewValue->u.ivalue;
 			
-			if ( info->mParams == 1 )
+			if ( funcFound )
 			{
-				// Get the full path name and find the number of parameters
-				char *first = "sys.path.append(\"";
-				char *last = "\")";
-				buffer = (char*)malloc( strlen(first)+strlen(gPath)+strlen(last) + 2 );
-				sprintf(buffer, "%s%s%s", first, gPath, last);
-				numArgs = FindPythonFunc(buffer);
-				int delta = numArgs;
-				
-				// Output a boolean showing if the function was found
-				Value fv;
-				fv.type = kBoolean;
-				fv.u.ivalue = funcFound;
-				SetOutputPropertyValue_(ip, inActorInfo, kOutputFuncFound, &fv);
-				
-				// Output test string
-				Value v;
-				v.type = kString;
-				AllocateValueString_(ip, "test", &v);
-				SetOutputPropertyValue_(ip, info->mActorInfoPtr, kOutputResult, &v);
-				ReleaseValueString_(ip, &v);
-				
-				// Dynamically change inputs of actor
-				UInt32 propCount;
-				IzzyError err = GetPropertyCount_(ip, inActorInfo, kInputProperty, &propCount);
-				PluginAssert_(ip, err == kIzzyNoError && propCount >= 1);
-				
-				UInt32 changeableOutputCount = propCount;
-				
-				int count = 0;
-				if (delta > 0)
-				{					
-					// get min and max value from the current value input property
-					Value valueMin;
-					Value valueMax;
-					Value valueInit;
-					// get current property display format
-					PropertyDispFormat availFmts;
-					PropertyDispFormat curFmt;
-					
-					while (delta-- > 0)
-					{
-						// Here we have to check to see what type the input is
-						if (types[count] == 0)
-						{
-							//fprintf(f, "Str\n");
-							
-							valueInit.type = kString;
-							AllocateValueString_(ip, "", &valueInit);
-							
-							GetPropertyMinMax_(ip, inActorInfo, kInputProperty, kInputPath, &valueMin, &valueMax, NULL);
-							availFmts = kDisplayFormatText;
-							curFmt = kDisplayFormatText;
-						}
-						else if (types[count] == 1)
-						{
-							//fprintf(f, "Int\n");
-							
-							valueMin.type = kInteger;
-							valueMin.u.ivalue = -2147483647;
-							valueMax.type = kInteger;
-							valueMax.u.ivalue = 2147483647;
-							valueInit.type = kInteger;
-							valueInit.u.ivalue = 0;
-							availFmts = kDisplayFormatNumber;
-							curFmt = kDisplayFormatNumber;
-						}
-						else if (types[count] == 2)
-						{
-							//fprintf(f, "Float\n");
-							
-							valueMin.type = kFloat;
-							valueMin.u.fvalue = -2147483647;
-							valueMax.type = kFloat;
-							valueMax.u.fvalue = 2147483647;
-							valueInit.type = kFloat;
-							valueInit.u.fvalue = 0;
-							availFmts = kDisplayFormatNumber;
-							curFmt = kDisplayFormatNumber;
-						}
-						
-						int index = changeableOutputCount + 1;
-						
-						//fprintf(f, "index %d\n", index);
-						
-						char propertyName[256];
-						// Here we get the input names from the paramNames array
-						// index - number of params + 1
-						sprintf(propertyName, "%s", paramNames[index-kInputArg0]);
-						
-						OSType rateType = CreatePropertyID(ip, "in", index);
-						
-						PropIDT code = CreatePropertyID(ip, "in", index);
-						
-						err = AddProperty_(ip, inActorInfo,
-										   kInputProperty,
-										   rateType,					// the input type
-										   FOUR_CHAR_CODE(code),		// the input to which we will conform
-										   propertyName,
-										   availFmts,
-										   curFmt,
-										   1,
-										   &valueMin,
-										   &valueMax,
-										   &valueInit);
-						PluginAssert_(ip, err == noErr);
-						
-						CopyPropDefValueSource_(ip, inActorInfo, kInputProperty, 1, kInputProperty, index);
-						
-						changeableOutputCount++;
-						count++;
-					}
-					
-					if (valueInit.type == kString)
-					{
-						ReleaseValueString_(ip, &valueInit);
-					}
-				}
-			}
-			else
-			{
-				UInt32 propCount;
-				IzzyError err = GetPropertyCount_(ip, inActorInfo, kInputProperty, &propCount);
-				
-				// Remove unwanted params
-				if (numArgs > 0)
+				if ( info->mParams == 1 )
 				{
-					int index = (kInputArg0-1) + numArgs;
-					for (i=0; i<numArgs; i++)
-					{
-						err = RemovePropertyProc_(ip, inActorInfo, kInputProperty, index);
-						PluginAssert_(ip, err == noErr);
-						index--;
-					}
+					AddArgInputProperties(ip, inActorInfo);
+				}
+				else
+				{
+					ClearArgInputProperties(ip, inActorInfo);
 				}
 			}
 			break;
@@ -980,8 +861,166 @@ HandlePropertyChangeValue(
 			//fprintf(f, "default\n");
 		}
 	}
+
+	if (findFunc) {
+		if (info->mPath !=NULL && info->mFile !=NULL && info->mFunc !=NULL) {
+			// Get the full path name and find the number of parameters
+			char *first = "sys.path.append(\"";
+			char *last = "\")";
+			buffer = (char*)malloc( strlen(first)+strlen(gPath)+strlen(last) + 2 );
+			sprintf(buffer, "%s%s%s", first, gPath, last);
+			numArgs = FindPythonFunc(buffer);
+		} else {
+			funcFound = false;
+			numArgs = 0;
+		}
+				
+		// Output a boolean showing if the function was found
+		Value fv;
+		fv.type = kBoolean;
+		fv.u.ivalue = funcFound;
+		SetOutputPropertyValue_(ip, inActorInfo, kOutputFuncFound, &fv);
+	}
 	
 	//fclose(f);
+}
+
+
+static void AddArgInputProperties(
+	IsadoraParameters*	ip,
+	ActorInfo*			inActorInfo) 
+{
+	int delta = numArgs;
+
+	/*
+	// Output test string
+	Value v;
+	v.type = kString;
+	AllocateValueString_(ip, "test", &v);
+	SetOutputPropertyValue_(ip, inActorInfo, kOutputResult, &v);
+	ReleaseValueString_(ip, &v);
+	*/
+
+	// Dynamically change inputs of actor
+	UInt32 propCount;
+	IzzyError err = GetPropertyCount_(ip, inActorInfo, kInputProperty, &propCount);
+	PluginAssert_(ip, err == kIzzyNoError && propCount >= 1);
+				
+	UInt32 changeableOutputCount = propCount;
+				
+	int count = 0;
+	if (delta > 0)
+	{					
+		// get min and max value from the current value input property
+		Value valueMin;
+		Value valueMax;
+		Value valueInit;
+		// get current property display format
+		PropertyDispFormat availFmts;
+		PropertyDispFormat curFmt;
+					
+		while (delta-- > 0)
+		{
+			// Here we have to check to see what type the input is
+			if (types[count] == 0)
+			{
+				//fprintf(f, "Str\n");
+							
+				valueInit.type = kString;
+				AllocateValueString_(ip, "", &valueInit);
+							
+				GetPropertyMinMax_(ip, inActorInfo, kInputProperty, kInputPath, &valueMin, &valueMax, NULL);
+				availFmts = kDisplayFormatText;
+				curFmt = kDisplayFormatText;
+			}
+			else if (types[count] == 1)
+			{
+				//fprintf(f, "Int\n");
+							
+				valueMin.type = kInteger;
+				valueMin.u.ivalue = -2147483647;
+				valueMax.type = kInteger;
+				valueMax.u.ivalue = 2147483647;
+				valueInit.type = kInteger;
+				valueInit.u.ivalue = 0;
+				availFmts = kDisplayFormatNumber;
+				curFmt = kDisplayFormatNumber;
+			}
+			else if (types[count] == 2)
+			{
+				//fprintf(f, "Float\n");
+							
+				valueMin.type = kFloat;
+				valueMin.u.fvalue = -2147483647;
+				valueMax.type = kFloat;
+				valueMax.u.fvalue = 2147483647;
+				valueInit.type = kFloat;
+				valueInit.u.fvalue = 0;
+				availFmts = kDisplayFormatNumber;
+				curFmt = kDisplayFormatNumber;
+			}
+						
+			int index = changeableOutputCount + 1;
+						
+			//fprintf(f, "index %d\n", index);
+						
+			char propertyName[256];
+			// Here we get the input names from the paramNames array
+			// index - number of params + 1
+			sprintf(propertyName, "%s", paramNames[index-kInputArg0]);
+						
+			OSType rateType = CreatePropertyID(ip, "in", index);
+						
+			PropIDT code = CreatePropertyID(ip, "in", index);
+						
+			err = AddProperty_(ip, inActorInfo,
+								kInputProperty,
+								rateType,					// the input type
+								FOUR_CHAR_CODE(code),		// the input to which we will conform
+								propertyName,
+								availFmts,
+								curFmt,
+								1,
+								&valueMin,
+								&valueMax,
+								&valueInit);
+			PluginAssert_(ip, err == noErr);
+						
+			CopyPropDefValueSource_(ip, inActorInfo, kInputProperty, 1, kInputProperty, index);
+						
+			changeableOutputCount++;
+			count++;
+		}
+					
+		if (valueInit.type == kString)
+		{
+			ReleaseValueString_(ip, &valueInit);
+		}
+	}
+}
+
+static void ClearArgInputProperties(	
+	IsadoraParameters*	ip,
+	ActorInfo*			inActorInfo) 
+{
+	// TODO: keep count in AddArgInputProperties, and remove only those,
+	// instead of relying on numArgs which might have changed.
+	UInt32 propCount;
+	IzzyError err = GetPropertyCount_(ip, inActorInfo, kInputProperty, &propCount);
+				
+	// Remove unwanted params
+	if (numArgs > 0)
+	{
+		int index = (kInputArg0-1) + numArgs;
+		for (i=0; i<numArgs; i++)
+		{
+			if(index <= propCount) {
+				err = RemovePropertyProc_(ip, inActorInfo, kInputProperty, index);
+				PluginAssert_(ip, err == noErr);
+			}
+			index--;
+		}
+	}
 }
 
 // ---------------------------------------------------------------------------------
