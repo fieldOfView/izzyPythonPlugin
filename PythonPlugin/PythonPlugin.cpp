@@ -39,7 +39,6 @@
 
 #include "IsadoraTypes.h"
 #include "IsadoraCallbacks.h"
-#include "ImageBufferUtil.h"
 #include "PluginDrawUtil.h"
 
 // STANDARD INCLUDES
@@ -143,7 +142,6 @@ bool funcFound = false;
 char *gPath; 
 char *gFile;
 char *gFunc;
-char *buffer;
 
 // For parameter input
 char **paramNames;
@@ -504,22 +502,21 @@ CreatePropertyID(
 //		 FindPythonFunc
 // ---------------------------------------------------------------------------------
 static int
-FindPythonFunc(
-	char *path)
+FindPythonFunc()
 {	
 	PyObject *pName, *pModule, *pDict, *pFunc = NULL, *pInspect, *argspec_tuple, *arglist;
 	int size = 0, i;
-	
-	//FILE *fp;
-	//fp=fopen("/Users/danelson/Desktop/params.txt", "w");
-	//fprintf(fp, "Python Function\n");
 	
 	// Initialize the python interpreter
 	Py_Initialize();
 	
 	// Make sure we are getting the module from the correct place
+	char *buffer = (char*)malloc( strlen(gPath)+25 );
+	sprintf(buffer, "sys.path.append(\"%s\")", gPath);
+
 	PyRun_SimpleString("import sys");
-	PyRun_SimpleString(path);
+	PyRun_SimpleString(buffer);
+	free(buffer);
 	
 	// Build the name object
 	pName = PyString_FromString(gFile);
@@ -608,19 +605,12 @@ FindPythonFunc(
 									}
 								}
 							}
-							
-							//fprintf(fp,"Parameter name %d: %s\n",i,paramNames[i]);
-							//fprintf(fp,"Parameter type %d: %s\n",i,paramTypes[i]);
-							//fprintf(fp,"Parameter type as int %d: %d\n\n",i,types[i]);
 						}
 					}
 				}
 			}
 		}
 	}
-	
-	//fprintf(fp,"Number of parameters: %d\n",size);
-	//fclose(fp);
 	
 	// Clean up
 	if(pFunc != NULL) Py_DECREF(pFunc);
@@ -637,10 +627,9 @@ FindPythonFunc(
 // Returns the length of the tuple
 static float
 CallPythonFunc(
-	char *path,
 	Value *parameters )
 {
-	PyObject *pName, *pModule, *pDict, *pFunc = NULL, *pValue, *pArgs, *retValues;
+	PyObject *pName, *pModule, *pDict, *pFunc = NULL, *pValue, *pArgs;
 	int i, size = 0;
 	float ret;
 	
@@ -648,8 +637,12 @@ CallPythonFunc(
 	Py_Initialize();
 	
 	// Make sure we are getting the module from the correct place
+	char *buffer = (char*)malloc( strlen(gPath)+25 );
+	sprintf(buffer, "sys.path.append(\"%s\")", gPath);
+
 	PyRun_SimpleString("import sys");
-	PyRun_SimpleString(path);
+	PyRun_SimpleString(buffer);
+	free(buffer);
 	
 	// Build the name object
 	pName = PyString_FromString(gFile);
@@ -779,10 +772,6 @@ HandlePropertyChangeValue(
 	// to this switch statement, to process the messages for your
 	// input properties
 	
-	//FILE *f;
-	//f=fopen("/Users/danelson/Desktop/test.txt", "w");
-	//fprintf(f,"inPropertyIndex1: %d\n", inPropertyIndex1);
-
 	bool findFunc = false;
 	
 	Value outputValue;
@@ -858,18 +847,14 @@ HandlePropertyChangeValue(
 			
 		default:
 		{
-			//fprintf(f, "default\n");
+
 		}
 	}
 
 	if (findFunc) {
 		if (info->mPath !=NULL && info->mFile !=NULL && info->mFunc !=NULL) {
-			// Get the full path name and find the number of parameters
-			char *first = "sys.path.append(\"";
-			char *last = "\")";
-			buffer = (char*)malloc( strlen(first)+strlen(gPath)+strlen(last) + 2 );
-			sprintf(buffer, "%s%s%s", first, gPath, last);
-			numArgs = FindPythonFunc(buffer);
+			// Find the function and number of parameters at the specified path
+			numArgs = FindPythonFunc();
 		} else {
 			funcFound = false;
 			numArgs = 0;
@@ -881,8 +866,6 @@ HandlePropertyChangeValue(
 		fv.u.ivalue = funcFound;
 		SetOutputPropertyValue_(ip, inActorInfo, kOutputFuncFound, &fv);
 	}
-	
-	//fclose(f);
 }
 
 
@@ -924,8 +907,6 @@ static void AddArgInputProperties(
 			// Here we have to check to see what type the input is
 			if (types[count] == 0)
 			{
-				//fprintf(f, "Str\n");
-							
 				valueInit.type = kString;
 				AllocateValueString_(ip, "", &valueInit);
 							
@@ -935,8 +916,6 @@ static void AddArgInputProperties(
 			}
 			else if (types[count] == 1)
 			{
-				//fprintf(f, "Int\n");
-							
 				valueMin.type = kInteger;
 				valueMin.u.ivalue = -2147483647;
 				valueMax.type = kInteger;
@@ -948,8 +927,6 @@ static void AddArgInputProperties(
 			}
 			else if (types[count] == 2)
 			{
-				//fprintf(f, "Float\n");
-							
 				valueMin.type = kFloat;
 				valueMin.u.fvalue = -2147483647;
 				valueMax.type = kFloat;
@@ -961,8 +938,6 @@ static void AddArgInputProperties(
 			}
 						
 			int index = changeableOutputCount + 1;
-						
-			//fprintf(f, "index %d\n", index);
 						
 			char propertyName[256];
 			// Here we get the input names from the paramNames array
@@ -1011,7 +986,7 @@ static void ClearArgInputProperties(
 	// Remove unwanted params
 	if (numArgs > 0)
 	{
-		int index = (kInputArg0-1) + numArgs;
+		unsigned int index = (kInputArg0-1) + numArgs;
 		for (i=0; i<numArgs; i++)
 		{
 			if(index <= propCount) {
