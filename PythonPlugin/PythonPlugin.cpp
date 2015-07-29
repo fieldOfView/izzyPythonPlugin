@@ -129,13 +129,14 @@ ClearArgInputProperties(
 // ### Declare global variables, common to all instantiations of this plugin here
 
 // For parameter input
-char **gParamNames;
 char gParamTypes[MAX_PARAMETERS][MAX_TYPE_STRING_SIZE];
 Value gParameters[MAX_PARAMETERS];
-int gParametersFlt[MAX_PARAMETERS];
-float gParametersInt[MAX_PARAMETERS];
-char* gParametersStr[MAX_PARAMETERS];
 int gTypes[MAX_PARAMETERS];
+
+struct Property {
+	char*				name;		// display name of the property
+	Value				value;		// contains type and data
+};
 
 // ---------------------------------------------------------------------------------
 // PluginInfo struct
@@ -153,13 +154,12 @@ typedef struct {
 	char*				mPath;
 	char*				mFile;
 	char*				mFunc;
-	bool				mParams;
+	bool				mLoadArgs;
 	
 	int					mNumArgs;
 	bool				mFuncFound;
 
-	char*				mOut;
-	char*				mErr;
+	Property**			mArgs;
 } PluginInfo;
 
 // A handy macro for casting the mActorDataPtr to PluginInfo*
@@ -318,6 +318,7 @@ CreateActor(
 	
 	info->mNumArgs = 0;
 	info->mFuncFound = false;
+	info->mArgs = NULL;
 }
 
 // ---------------------------------------------------------------------------------
@@ -341,7 +342,18 @@ DisposeActor(
 		free(info->mFile);
 	if (info->mFunc != NULL)
 		free(info->mFunc);
-
+	
+	if (info->mArgs != NULL)
+	{
+		int i, size;
+		size = sizeof(info->mArgs);
+		for ( i=0; i<size; i++) {
+			free(info->mArgs[i]->name);
+			free(info->mArgs[i]);
+		}
+		free(info->mArgs);
+	}
+	
 	// destroy the PluginInfo struct allocated with IzzyMallocClear_ the CreateActor function
 	PluginAssert_(ip, ioActorInfo->mActorDataPtr != nil);
 	IzzyFree_(ip, ioActorInfo->mActorDataPtr);
@@ -510,6 +522,19 @@ FindPythonFunc(
 	PyObject *pName, *pModule, *pDict, *pFunc = NULL, *pInspect, *argspec_tuple, *arglist;
 	int size = 0, i;
 	
+	if (info->mArgs != NULL)
+	{
+		// free memory for previously created args
+		int i, size;
+		size = sizeof(info->mArgs);
+		for ( i=0; i<size; i++) {
+			free(info->mArgs[i]->name);
+			free(info->mArgs[i]);
+		}
+		free(info->mArgs);
+		info->mArgs = NULL;
+	}
+
 	// Initialize the python interpreter
 	Py_Initialize();
 	
@@ -566,8 +591,8 @@ FindPythonFunc(
 						// get the number arguments
 						size = (int)PyObject_Size(arglist);
 						
-						//allocate memory for strings and types
-						gParamNames = (char**)malloc(size*sizeof(char));
+						//allocate memory for properties
+						info->mArgs = (Property**)malloc(size * sizeof(Property));
 						
 						for ( i=0; i<size; i++)
 						{
@@ -578,7 +603,10 @@ FindPythonFunc(
 							PyObject *argname = PyObject_Str(list);
 							
 							//convert python string to C string
-							gParamNames[i] = PyString_AsString(argname);
+							char *name = PyString_AsString(argname);
+							info->mArgs[i] = (Property*)malloc(sizeof(Property));
+							info->mArgs[i]->name = static_cast<char*>(malloc(strlen(name)+1));
+							strcpy(info->mArgs[i]->name, name);
 							
 							// get the types by chopping after the underscore
 							char *temp = PyString_AsString(argname);
@@ -690,36 +718,36 @@ CallPythonFunc(
 			int countStr = 0;
 			if (gParamTypes[i] == "flt")
 			{
+				/*
 				double temp = (double)gParametersFlt[countFlt];			
 				pValue = PyFloat_FromDouble(temp);
 				PyTuple_SetItem(pArgs,i,pValue);
 				countFlt++;
 				
-				/*
 				 pValue = PyFloat_FromDouble(gParameters[i]);
 				 PyTuple_SetItem(pArgs,i,pValue);
 				 */
 			}
 			else if (gParamTypes[i] == "int")
 			{
+				/*
 				long temp = (long)gParametersInt[countInt];			
 				pValue = PyInt_FromLong(temp);
 				PyTuple_SetItem(pArgs,i,pValue);
 				countInt++;
 				
-				/*
 				 pValue = PyInt_FromLong(gParameters[i]);
 				 PyTuple_SetItem(pArgs,i,pValue);
 				 */
 			}
 			else
 			{
+				/*
 				const char *temp = gParametersStr[countStr];			
 				pValue = PyString_FromString(temp);
 				PyTuple_SetItem(pArgs,i,pValue);
 				countStr++;
 				
-				/*
 				 pValue = PyString_FromString(gParameters[i]);
 				 PyTuple_SetItem(pArgs,i,pValue);
 				 */
@@ -734,9 +762,6 @@ CallPythonFunc(
 		{
 			// get the number arguments
 			size = (int)PyObject_Size(pValue);
-			
-			//allocate memory for strings and types
-			gParamNames = (char**)malloc(size*sizeof(char));
 			
 			for ( i=0; i<size; i++)
 			{
@@ -851,11 +876,11 @@ HandlePropertyChangeValue(
 			
 		case kInputParams:
 		{
-			info->mParams = inNewValue->u.ivalue;
+			info->mLoadArgs = inNewValue->u.ivalue;
 			
 			if ( info->mFuncFound )
 			{
-				if ( info->mParams == 1 )
+				if ( info->mLoadArgs == 1 )
 				{
 					AddArgInputProperties(ip, inActorInfo);
 				}
@@ -962,11 +987,6 @@ static void AddArgInputProperties(
 						
 			int index = changeableOutputCount + 1;
 						
-			char propertyName[256];
-			// Here we get the input names from the gParamNames array
-			// index - number of params + 1
-			sprintf(propertyName, "%s", gParamNames[index-kInputArg0]);
-						
 			OSType rateType = CreatePropertyID(ip, "in", index);
 						
 			PropIDT code = CreatePropertyID(ip, "in", index);
@@ -975,7 +995,7 @@ static void AddArgInputProperties(
 								kInputProperty,
 								rateType,					// the input type
 								FOUR_CHAR_CODE(code),		// the input to which we will conform
-								propertyName,
+								info->mArgs[index-kInputArg0]->name,
 								availFmts,
 								curFmt,
 								1,
