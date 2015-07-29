@@ -1,5 +1,7 @@
 // ===========================================================================
-//	Isadora Python Plugin		  ©2003 Mark F. Coniglio. All rights reserved.
+//	Isadora Python Plugin							©2015 Aldo Hooeben,
+//													©2003 Mark F. Coniglio. 
+//													All rights reserved.
 // ===========================================================================
 //
 //	Based on ExecutePythonFunction.cpp ©2003 Mark F. Coniglio.
@@ -24,13 +26,6 @@
 //	In no event shall TroikaTronix be liable for any special, indirect, incidental,
 //	or consequential damages arising in any way out of the use, reproduction,
 //	modification and/or distribution of this software.
-//
-// ===========================================================================
-//
-// CUSTOMIZING THIS SOURCE CODE
-// To customize this file, search for the text ###. All of the places where
-// you will need to customize the file are marked with this pattern of 
-// characters.
 //
 
 // ---------------------------------------------------------------------------------
@@ -132,11 +127,8 @@ ClearArgInputProperties(
 // GLOBAL VARIABLES
 // ---------------------------------------------------------------------------------
 // ### Declare global variables, common to all instantiations of this plugin here
-Boolean isPath = false;
-Boolean isFile = false;
-Boolean isFunc = false;
-int numArgs = 0;
-bool funcFound = false;
+int gNumArgs = 0;
+bool gFuncFound = false;
 
 // For the file path
 char *gPath; 
@@ -171,7 +163,6 @@ typedef struct {
 	char*				mFunc;
 	Boolean				mParams;
 	
-	Boolean				mFunctionFound;
 	char*				mOut;
 	char*				mErr;
 } PluginInfo;
@@ -234,6 +225,7 @@ static const char* sPropertyDefinitionString =
 // OUTPUT PROPERTY DEFINITIONS
 //	TYPE 	 PROPERTY NAME	ID		DATATYPE	DISPLAY FMT			MIN		MAX		INIT VALUE
 	"OUTPROP 	function_found	parm	bool		onoff				0		1		0\r"
+	"OUTPROP 	function_ran	ran		bool		trig				0		1		0\r"
 	"OUTPROP	error			err		string		text				*		*		\r"
 	"OUTPROP	output			out		string		text				*		*		\r";
 
@@ -253,6 +245,7 @@ enum
 	kInputArg0,
 	
 	kOutputFuncFound = 1,
+	kOutputTrigger,
 	kOutputError,
 	kOutputResult
 };
@@ -292,6 +285,8 @@ const char* sHelpStrings[] =
 
 	"Set to 'on' if the specified python function was found.",
 	
+	"Triggered when the function has succesfully executed.",
+
 	"Outputs any error string returned by the python function. "
 
 	"Outputs data returned by the python function. "
@@ -542,7 +537,7 @@ FindPythonFunc()
 		}
 	}
 	
-	funcFound = (pFunc != NULL);
+	gFuncFound = (pFunc != NULL);
 	
 	pName = PyString_FromString("inspect");	
 	if (pName != NULL)
@@ -671,9 +666,9 @@ CallPythonFunc(
 	if (PyCallable_Check(pFunc))
 	{		
 		// Set the number of arguments
-		pArgs = PyTuple_New(numArgs);
+		pArgs = PyTuple_New(gNumArgs);
 		
-		for (i=0; i<numArgs; i++)
+		for (i=0; i<gNumArgs; i++)
 		{
 			int countFlt = 0;
 			int countInt = 0;
@@ -784,9 +779,15 @@ HandlePropertyChangeValue(
 	switch (inPropertyIndex1) {
 		
 		case kInputTrigger:
-			if (funcFound)
+			if (gFuncFound)
 			{
 				// TODO: call function
+
+				// Output trigger
+				Value fv;
+				fv.type = kBoolean;
+				fv.u.ivalue = 1;
+				SetOutputPropertyValue_(ip, inActorInfo, kOutputTrigger, &fv);
 			}
 			break;
 		
@@ -800,7 +801,6 @@ HandlePropertyChangeValue(
 			{
 				info->mPath = static_cast<char*>(malloc(strlen(inNewValue->u.str->strData)+1));
 				strcpy(info->mPath, inNewValue->u.str->strData);
-				isPath = true;
 				gPath = info->mPath;
 			}
 			findFunc = true;
@@ -816,7 +816,6 @@ HandlePropertyChangeValue(
 			{
 				info->mFile = static_cast<char*>(malloc(strlen(inNewValue->u.str->strData)+1));
 				strcpy(info->mFile, inNewValue->u.str->strData);
-				isFile = true;
 				gFile = info->mFile;
 			}
 			findFunc = true;
@@ -832,7 +831,6 @@ HandlePropertyChangeValue(
 			{
 				info->mFunc = static_cast<char*>(malloc(strlen(inNewValue->u.str->strData)+1));
 				strcpy(info->mFunc, inNewValue->u.str->strData);
-				isFunc = true;
 				gFunc = info->mFunc;
 			}
 			findFunc = true;
@@ -842,7 +840,7 @@ HandlePropertyChangeValue(
 		{
 			info->mParams = inNewValue->u.ivalue;
 			
-			if ( funcFound )
+			if ( gFuncFound )
 			{
 				if ( info->mParams == 1 )
 				{
@@ -865,16 +863,16 @@ HandlePropertyChangeValue(
 	if (findFunc) {
 		if (info->mPath !=NULL && info->mFile !=NULL && info->mFunc !=NULL) {
 			// Find the function and number of parameters at the specified path
-			numArgs = FindPythonFunc();
+			gNumArgs = FindPythonFunc();
 		} else {
-			funcFound = false;
-			numArgs = 0;
+			gFuncFound = false;
+			gNumArgs = 0;
 		}
 				
 		// Output a boolean showing if the function was found
 		Value fv;
 		fv.type = kBoolean;
-		fv.u.ivalue = funcFound;
+		fv.u.ivalue = gFuncFound;
 		SetOutputPropertyValue_(ip, inActorInfo, kOutputFuncFound, &fv);
 	}
 }
@@ -884,7 +882,7 @@ static void AddArgInputProperties(
 	IsadoraParameters*	ip,
 	ActorInfo*			inActorInfo) 
 {
-	int delta = numArgs;
+	int delta = gNumArgs;
 
 	/*
 	// Output test string
@@ -990,15 +988,15 @@ static void ClearArgInputProperties(
 	ActorInfo*			inActorInfo) 
 {
 	// TODO: keep count in AddArgInputProperties, and remove only those,
-	// instead of relying on numArgs which might have changed.
+	// instead of relying on gNumArgs which might have changed.
 	UInt32 propCount;
 	IzzyError err = GetPropertyCount_(ip, inActorInfo, kInputProperty, &propCount);
 				
 	// Remove unwanted params
-	if (numArgs > 0)
+	if (gNumArgs > 0)
 	{
-		unsigned int index = (kInputArg0-1) + numArgs;
-		for (i=0; i<numArgs; i++)
+		unsigned int index = (kInputArg0-1) + gNumArgs;
+		for (i=0; i<gNumArgs; i++)
 		{
 			if(index <= propCount) {
 				err = RemovePropertyProc_(ip, inActorInfo, kInputProperty, index);
