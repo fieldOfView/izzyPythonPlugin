@@ -127,24 +127,16 @@ ClearArgInputProperties(
 // GLOBAL VARIABLES
 // ---------------------------------------------------------------------------------
 // ### Declare global variables, common to all instantiations of this plugin here
-int gNumArgs = 0;
-bool gFuncFound = false;
-
-// For the file path
-char *gPath; 
-char *gFile;
-char *gFunc;
 
 // For parameter input
-char **paramNames;
-char paramTypes[MAX_PARAMETERS][MAX_TYPE_STRING_SIZE];
-Value parameters[MAX_PARAMETERS];
-int parametersFlt[MAX_PARAMETERS];
-float parametersInt[MAX_PARAMETERS];
-char* parametersStr[MAX_PARAMETERS];
-int types[MAX_PARAMETERS];
+char **gParamNames;
+char gParamTypes[MAX_PARAMETERS][MAX_TYPE_STRING_SIZE];
+Value gParameters[MAX_PARAMETERS];
+int gParametersFlt[MAX_PARAMETERS];
+float gParametersInt[MAX_PARAMETERS];
+char* gParametersStr[MAX_PARAMETERS];
+int gTypes[MAX_PARAMETERS];
 
-int size,i;
 // ---------------------------------------------------------------------------------
 // PluginInfo struct
 // ---------------------------------------------------------------------------------
@@ -161,8 +153,11 @@ typedef struct {
 	char*				mPath;
 	char*				mFile;
 	char*				mFunc;
-	Boolean				mParams;
+	bool				mParams;
 	
+	int					mNumArgs;
+	bool				mFuncFound;
+
 	char*				mOut;
 	char*				mErr;
 } PluginInfo;
@@ -320,6 +315,9 @@ CreateActor(
 	
 	ioActorInfo->mActorDataPtr = info;
 	info->mActorInfoPtr = ioActorInfo;
+	
+	info->mNumArgs = 0;
+	info->mFuncFound = false;
 }
 
 // ---------------------------------------------------------------------------------
@@ -337,7 +335,12 @@ DisposeActor(
 	PluginAssert_(ip, info != nil);
 	
 	// ### destruction of private member variables
-	
+	if (info->mPath != NULL)
+		free(info->mPath);
+	if (info->mFile != NULL)
+		free(info->mFile);
+	if (info->mFunc != NULL)
+		free(info->mFunc);
 
 	// destroy the PluginInfo struct allocated with IzzyMallocClear_ the CreateActor function
 	PluginAssert_(ip, ioActorInfo->mActorDataPtr != nil);
@@ -501,7 +504,8 @@ CreatePropertyID(
 //		 FindPythonFunc
 // ---------------------------------------------------------------------------------
 static int
-FindPythonFunc()
+FindPythonFunc(
+	PluginInfo* info )
 {	
 	PyObject *pName, *pModule, *pDict, *pFunc = NULL, *pInspect, *argspec_tuple, *arglist;
 	int size = 0, i;
@@ -510,15 +514,18 @@ FindPythonFunc()
 	Py_Initialize();
 	
 	// Make sure we are getting the module from the correct place
-	char *buffer = (char*)malloc( strlen(gPath)+25 );
-	sprintf(buffer, "sys.path.append(\"%s\")", gPath);
+	if(info->mPath != NULL)
+	{
+		char *buffer = (char*)malloc( strlen(info->mPath)+25 );
+		sprintf(buffer, "sys.path.append(\"%s\")", info->mPath);
 
-	PyRun_SimpleString("import sys");
-	PyRun_SimpleString(buffer);
-	free(buffer);
+		PyRun_SimpleString("import sys");
+		PyRun_SimpleString(buffer);
+		free(buffer);
+	}
 	
 	// Build the name object
-	pName = PyString_FromString(gFile);
+	pName = PyString_FromString(info->mFile);
 	if (pName != NULL)
 	{	
 		// Load the module object
@@ -532,12 +539,12 @@ FindPythonFunc()
 			if (pDict != NULL)
 			{
 				// pFunc is a borrowed reference
-				pFunc = PyDict_GetItemString(pDict, gFunc);
+				pFunc = PyDict_GetItemString(pDict, info->mFunc);
 			}
 		}
 	}
 	
-	gFuncFound = (pFunc != NULL);
+	info->mFuncFound = (pFunc != NULL);
 	
 	pName = PyString_FromString("inspect");	
 	if (pName != NULL)
@@ -560,7 +567,7 @@ FindPythonFunc()
 						size = (int)PyObject_Size(arglist);
 						
 						//allocate memory for strings and types
-						paramNames = (char**)malloc(size*sizeof(char));
+						gParamNames = (char**)malloc(size*sizeof(char));
 						
 						for ( i=0; i<size; i++)
 						{
@@ -571,7 +578,7 @@ FindPythonFunc()
 							PyObject *first = PyObject_Str(list);
 							
 							//convert python string to C string
-							paramNames[i] = PyString_AsString(first);
+							gParamNames[i] = PyString_AsString(first);
 							
 							// get the types by chopping after the underscore
 							char *temp = PyString_AsString(first);
@@ -589,18 +596,18 @@ FindPythonFunc()
 								}
 								else
 								{
-									//strcpy(paramTypes[i],result);
+									//strcpy(gParamTypes[i],result);
 									if (strcmp(result,"str") == 0)
 									{
-										types[i] = 0;
+										gTypes[i] = 0;
 									}
 									else if (strcmp(result,"int") == 0)
 									{
-										types[i] = 1;
+										gTypes[i] = 1;
 									}
 									else if (strcmp(result,"flt") == 0)
 									{
-										types[i] = 2;
+										gTypes[i] = 2;
 									}
 								}
 							}
@@ -625,8 +632,8 @@ FindPythonFunc()
 // ---------------------------------------------------------------------------------
 // Returns the length of the tuple
 static float
-CallPythonFunc(
-	Value *parameters )
+CallPythonFunc( 
+	PluginInfo* info )
 {
 	PyObject *pName, *pModule, *pDict, *pFunc = NULL, *pValue, *pArgs;
 	int i, size = 0;
@@ -636,15 +643,18 @@ CallPythonFunc(
 	Py_Initialize();
 	
 	// Make sure we are getting the module from the correct place
-	char *buffer = (char*)malloc( strlen(gPath)+25 );
-	sprintf(buffer, "sys.path.append(\"%s\")", gPath);
+	if(info->mPath != NULL)
+	{
+		char *buffer = (char*)malloc( strlen(info->mPath)+25 );
+		sprintf(buffer, "sys.path.append(\"%s\")", info->mPath);
 
-	PyRun_SimpleString("import sys");
-	PyRun_SimpleString(buffer);
-	free(buffer);
+		PyRun_SimpleString("import sys");
+		PyRun_SimpleString(buffer);
+		free(buffer);
+	}
 	
 	// Build the name object
-	pName = PyString_FromString(gFile);
+	pName = PyString_FromString(info->mFile);
 	if (pName != NULL)
 	{
 		// Load the module object
@@ -658,7 +668,7 @@ CallPythonFunc(
 			if (pDict != NULL)
 			{
 				// pFunc is a borrowed reference
-				pFunc = PyDict_GetItemString(pDict, gFunc);
+				pFunc = PyDict_GetItemString(pDict, info->mFunc);
 			}
 		}
 	}
@@ -666,46 +676,46 @@ CallPythonFunc(
 	if (PyCallable_Check(pFunc))
 	{		
 		// Set the number of arguments
-		pArgs = PyTuple_New(gNumArgs);
+		pArgs = PyTuple_New(info->mNumArgs);
 		
-		for (i=0; i<gNumArgs; i++)
+		for (i=0; i<info->mNumArgs; i++)
 		{
 			int countFlt = 0;
 			int countInt = 0;
 			int countStr = 0;
-			if (paramTypes[i] == "flt")
+			if (gParamTypes[i] == "flt")
 			{
-				double temp = (double)parametersFlt[countFlt];			
+				double temp = (double)gParametersFlt[countFlt];			
 				pValue = PyFloat_FromDouble(temp);
 				PyTuple_SetItem(pArgs,i,pValue);
 				countFlt++;
 				
 				/*
-				 pValue = PyFloat_FromDouble(parameters[i]);
+				 pValue = PyFloat_FromDouble(gParameters[i]);
 				 PyTuple_SetItem(pArgs,i,pValue);
 				 */
 			}
-			else if (paramTypes[i] == "int")
+			else if (gParamTypes[i] == "int")
 			{
-				long temp = (long)parametersInt[countInt];			
+				long temp = (long)gParametersInt[countInt];			
 				pValue = PyInt_FromLong(temp);
 				PyTuple_SetItem(pArgs,i,pValue);
 				countInt++;
 				
 				/*
-				 pValue = PyInt_FromLong(parameters[i]);
+				 pValue = PyInt_FromLong(gParameters[i]);
 				 PyTuple_SetItem(pArgs,i,pValue);
 				 */
 			}
 			else
 			{
-				const char *temp = parametersStr[countStr];			
+				const char *temp = gParametersStr[countStr];			
 				pValue = PyString_FromString(temp);
 				PyTuple_SetItem(pArgs,i,pValue);
 				countStr++;
 				
 				/*
-				 pValue = PyString_FromString(parameters[i]);
+				 pValue = PyString_FromString(gParameters[i]);
 				 PyTuple_SetItem(pArgs,i,pValue);
 				 */
 			}
@@ -721,7 +731,7 @@ CallPythonFunc(
 			size = (int)PyObject_Size(pValue);
 			
 			//allocate memory for strings and types
-			paramNames = (char**)malloc(size*sizeof(char));
+			gParamNames = (char**)malloc(size*sizeof(char));
 			
 			for ( i=0; i<size; i++)
 			{
@@ -779,9 +789,10 @@ HandlePropertyChangeValue(
 	switch (inPropertyIndex1) {
 		
 		case kInputTrigger:
-			if (gFuncFound)
+			if (info->mFuncFound)
 			{
 				// TODO: call function
+				CallPythonFunc(info);
 
 				// Output trigger
 				Value fv;
@@ -792,7 +803,7 @@ HandlePropertyChangeValue(
 			break;
 		
 		case kInputPath:
-			if (info->mPath !=NULL)
+			if (info->mPath != NULL)
 			{
 				free(info->mPath);
 				info->mPath = NULL;
@@ -801,13 +812,12 @@ HandlePropertyChangeValue(
 			{
 				info->mPath = static_cast<char*>(malloc(strlen(inNewValue->u.str->strData)+1));
 				strcpy(info->mPath, inNewValue->u.str->strData);
-				gPath = info->mPath;
 			}
 			findFunc = true;
 			break;
 			
 		case kInputFile:
-			if (info->mFile !=NULL)
+			if (info->mFile != NULL)
 			{
 				free(info->mFile);
 				info->mFile = NULL;
@@ -816,13 +826,12 @@ HandlePropertyChangeValue(
 			{
 				info->mFile = static_cast<char*>(malloc(strlen(inNewValue->u.str->strData)+1));
 				strcpy(info->mFile, inNewValue->u.str->strData);
-				gFile = info->mFile;
 			}
 			findFunc = true;
 			break;
 			
 		case kInputFunc:
-			if (info->mFunc !=NULL)
+			if (info->mFunc != NULL)
 			{
 				free(info->mFunc);
 				info->mFunc = NULL;
@@ -831,7 +840,6 @@ HandlePropertyChangeValue(
 			{
 				info->mFunc = static_cast<char*>(malloc(strlen(inNewValue->u.str->strData)+1));
 				strcpy(info->mFunc, inNewValue->u.str->strData);
-				gFunc = info->mFunc;
 			}
 			findFunc = true;
 			break;
@@ -840,7 +848,7 @@ HandlePropertyChangeValue(
 		{
 			info->mParams = inNewValue->u.ivalue;
 			
-			if ( gFuncFound )
+			if ( info->mFuncFound )
 			{
 				if ( info->mParams == 1 )
 				{
@@ -861,18 +869,18 @@ HandlePropertyChangeValue(
 	}
 
 	if (findFunc) {
-		if (info->mPath !=NULL && info->mFile !=NULL && info->mFunc !=NULL) {
+		if (info->mFile != NULL && info->mFunc != NULL) {
 			// Find the function and number of parameters at the specified path
-			gNumArgs = FindPythonFunc();
+			info->mNumArgs = FindPythonFunc(info);
 		} else {
-			gFuncFound = false;
-			gNumArgs = 0;
+			info->mFuncFound = false;
+			info->mNumArgs = 0;
 		}
 				
 		// Output a boolean showing if the function was found
 		Value fv;
 		fv.type = kBoolean;
-		fv.u.ivalue = gFuncFound;
+		fv.u.ivalue = info->mFuncFound;
 		SetOutputPropertyValue_(ip, inActorInfo, kOutputFuncFound, &fv);
 	}
 }
@@ -882,7 +890,8 @@ static void AddArgInputProperties(
 	IsadoraParameters*	ip,
 	ActorInfo*			inActorInfo) 
 {
-	int delta = gNumArgs;
+	PluginInfo* info = GetPluginInfo_(inActorInfo);
+	int delta = info->mNumArgs;
 
 	/*
 	// Output test string
@@ -914,7 +923,7 @@ static void AddArgInputProperties(
 		while (delta-- > 0)
 		{
 			// Here we have to check to see what type the input is
-			if (types[count] == 0)
+			if (gTypes[count] == 0)
 			{
 				valueInit.type = kString;
 				AllocateValueString_(ip, "", &valueInit);
@@ -923,7 +932,7 @@ static void AddArgInputProperties(
 				availFmts = kDisplayFormatText;
 				curFmt = kDisplayFormatText;
 			}
-			else if (types[count] == 1)
+			else if (gTypes[count] == 1)
 			{
 				valueMin.type = kInteger;
 				valueMin.u.ivalue = -2147483647;
@@ -934,7 +943,7 @@ static void AddArgInputProperties(
 				availFmts = kDisplayFormatNumber;
 				curFmt = kDisplayFormatNumber;
 			}
-			else if (types[count] == 2)
+			else if (gTypes[count] == 2)
 			{
 				valueMin.type = kFloat;
 				valueMin.u.fvalue = -2147483647;
@@ -949,9 +958,9 @@ static void AddArgInputProperties(
 			int index = changeableOutputCount + 1;
 						
 			char propertyName[256];
-			// Here we get the input names from the paramNames array
+			// Here we get the input names from the gParamNames array
 			// index - number of params + 1
-			sprintf(propertyName, "%s", paramNames[index-kInputArg0]);
+			sprintf(propertyName, "%s", gParamNames[index-kInputArg0]);
 						
 			OSType rateType = CreatePropertyID(ip, "in", index);
 						
@@ -987,16 +996,19 @@ static void ClearArgInputProperties(
 	IsadoraParameters*	ip,
 	ActorInfo*			inActorInfo) 
 {
+	PluginInfo* info = GetPluginInfo_(inActorInfo);
+
 	// TODO: keep count in AddArgInputProperties, and remove only those,
 	// instead of relying on gNumArgs which might have changed.
 	UInt32 propCount;
 	IzzyError err = GetPropertyCount_(ip, inActorInfo, kInputProperty, &propCount);
 				
 	// Remove unwanted params
-	if (gNumArgs > 0)
+	if (info->mNumArgs > 0)
 	{
-		unsigned int index = (kInputArg0-1) + gNumArgs;
-		for (i=0; i<gNumArgs; i++)
+		unsigned int index = (kInputArg0-1) + info->mNumArgs;
+		int i;
+		for (i=0; i<info->mNumArgs; i++)
 		{
 			if(index <= propCount) {
 				err = RemovePropertyProc_(ip, inActorInfo, kInputProperty, index);
