@@ -210,7 +210,7 @@ static const char* kActorName		= "PythonPlugin";
 static const char* sPropertyDefinitionString =
 
 // INPUT PROPERTY DEFINITIONS
-//	TYPE 	PROPERTY NAME	ID		DATATYPE	DISPLAY FMT			MIN		MAX		INIT VALUE
+//	TYPE 		PROPERTY NAME	ID		DATATYPE	DISPLAY FMT			MIN		MAX		INIT VALUE
 	"INPROP		trigger			trig	bool		trig				0		1		0\r"
 	"INPROP		path			path	string		text				*		*		\r"
 	"INPROP		module			file	string		text				*		*		\r"
@@ -218,8 +218,8 @@ static const char* sPropertyDefinitionString =
 	"INPROP		params			parm	bool		onoff				0		1		0\r"
 
 // OUTPUT PROPERTY DEFINITIONS
-//	TYPE 	 PROPERTY NAME	ID		DATATYPE	DISPLAY FMT			MIN		MAX		INIT VALUE
-	"OUTPROP 	function_found	parm	bool		onoff				0		1		0\r"
+//	TYPE 		PROPERTY NAME	ID		DATATYPE	DISPLAY FMT			MIN		MAX		INIT VALUE
+	"OUTPROP 	function_found	fnd		bool		onoff				0		1		0\r"
 	"OUTPROP 	function_ran	ran		bool		trig				0		1		0\r"
 	"OUTPROP	error			err		string		text				*		*		\r"
 	"OUTPROP	output			out		string		text				*		*		\r";
@@ -575,13 +575,13 @@ FindPythonFunc(
 							PyObject *list = PyList_GetItem(arglist,i);
 							
 							//grab python strings from the list
-							PyObject *first = PyObject_Str(list);
+							PyObject *argname = PyObject_Str(list);
 							
 							//convert python string to C string
-							gParamNames[i] = PyString_AsString(first);
+							gParamNames[i] = PyString_AsString(argname);
 							
 							// get the types by chopping after the underscore
-							char *temp = PyString_AsString(first);
+							char *temp = PyString_AsString(argname);
 							char *delims = "_";
 							char *result;
 							result = strtok( temp, delims );
@@ -611,10 +611,15 @@ FindPythonFunc(
 									}
 								}
 							}
+							Py_DECREF(list);
+							Py_DECREF(argname);
 						}
+						Py_DECREF(arglist);
 					}
+					Py_DECREF(argspec_tuple);
 				}
 			}
+			Py_DECREF(pInspect);
 		}
 	}
 	
