@@ -44,9 +44,6 @@
 
 #include <Python.h>
 
-#define MAX_PARAMETERS 10
-#define MAX_TYPE_STRING_SIZE 4
-
 // ---------------------------------------------------------------------------------
 // MacOS Specific
 // ---------------------------------------------------------------------------------
@@ -128,14 +125,16 @@ ClearArgInputProperties(
 // ---------------------------------------------------------------------------------
 // ### Declare global variables, common to all instantiations of this plugin here
 
-// For parameter input
-char gParamTypes[MAX_PARAMETERS][MAX_TYPE_STRING_SIZE];
-Value gParameters[MAX_PARAMETERS];
-int gTypes[MAX_PARAMETERS];
+
+// ---------------------------------------------------------------------------------
+// Property struct
+// ---------------------------------------------------------------------------------
+// This structure is used to store property names, types and values in the 
+// PluginInfo struct.
 
 struct Property {
 	char*				name;		// display name of the property
-	Value				value;		// contains type and data
+	Value*				value;		// contains type and data
 };
 
 // ---------------------------------------------------------------------------------
@@ -347,8 +346,14 @@ DisposeActor(
 	{
 		int i, size;
 		size = sizeof(info->mArgs);
-		for ( i=0; i<size; i++) {
+		for ( i=0; i<size; i++)
+		{
 			free(info->mArgs[i]->name);
+			if (info->mArgs[i]->value->type == kString)
+			{
+				ReleaseValueString_(ip, info->mArgs[i]->value);
+			}
+			free(info->mArgs[i]->value);
 			free(info->mArgs[i]);
 		}
 		free(info->mArgs);
@@ -517,9 +522,10 @@ CreatePropertyID(
 // ---------------------------------------------------------------------------------
 static int
 FindPythonFunc(
+	IsadoraParameters*	ip,
 	PluginInfo* info )
 {	
-	PyObject *pName, *pModule, *pDict, *pFunc = NULL, *pInspect, *argspec_tuple, *arglist;
+	PyObject *pName, *pModule, *pDict, *pFunc = NULL, *pInspect, *argspec_tuple, *arglist, *defaults, *defaultvalue;
 	int size = 0, i;
 	
 	if (info->mArgs != NULL)
@@ -527,8 +533,14 @@ FindPythonFunc(
 		// free memory for previously created args
 		int i, size;
 		size = sizeof(info->mArgs);
-		for ( i=0; i<size; i++) {
+		for ( i=0; i<size; i++)
+		{
 			free(info->mArgs[i]->name);
+			if (info->mArgs[i]->value->type == kString)
+			{
+				ReleaseValueString_(ip, info->mArgs[i]->value);
+			}
+			free(info->mArgs[i]->value);
 			free(info->mArgs[i]);
 		}
 		free(info->mArgs);
@@ -586,10 +598,14 @@ FindPythonFunc(
 				if (argspec_tuple != NULL)
 				{
 					arglist = PyTuple_GetItem(argspec_tuple, 0);
-					if (arglist != NULL)
+					defaults = PyTuple_GetItem(argspec_tuple, 3);
+					if (arglist != NULL && defaults != NULL)
 					{
 						// get the number arguments
 						size = (int)PyObject_Size(arglist);
+						
+						int defaults_offset = (int)PyObject_Size(defaults) - size;
+						Py_DECREF(defaults);
 						
 						//allocate memory for properties
 						info->mArgs = (Property**)malloc(size * sizeof(Property));
@@ -601,6 +617,7 @@ FindPythonFunc(
 							
 							//grab python strings from the list
 							PyObject *argname = PyObject_Str(list);
+							Py_DECREF(list);
 							
 							//convert python string to C string
 							char *name = PyString_AsString(argname);
@@ -608,41 +625,83 @@ FindPythonFunc(
 							info->mArgs[i]->name = static_cast<char*>(malloc(strlen(name)+1));
 							strcpy(info->mArgs[i]->name, name);
 							
-							// get the types by chopping after the underscore
-							char *temp = PyString_AsString(argname);
-							char *delims = "_";
-							char *result;
-							result = strtok( temp, delims );
+							info->mArgs[i]->value = (Value*)malloc(sizeof(Value));
 							
-							// ### CHECK THIS STRUCTURE
-							while( result != NULL )
-							{
-								result = strtok( NULL, delims );
-								if (result == NULL)
+							//try to deduce the argument type
+							
+							if (i+defaults_offset >= 0) {
+								//first check if there is a default value we can use
+								defaultvalue = PyTuple_GetItem(defaults, i+defaults_offset);
+								const char* type = defaultvalue->ob_type->tp_name; 
+								if( strcmp(type, "int") == 0 )
 								{
-									break;
+									info->mArgs[i]->value->type = kInteger;
+									info->mArgs[i]->value->u.ivalue = PyInt_AsLong(defaultvalue);
+								} 
+								else if( strcmp(type, "float") == 0 )
+								{
+									info->mArgs[i]->value->type = kFloat;
+									info->mArgs[i]->value->u.fvalue = PyFloat_AsDouble(defaultvalue);
+								} 
+								else if( strcmp(type, "bool") == 0 )
+								{
+									info->mArgs[i]->value->type = kBoolean;
+									info->mArgs[i]->value->u.ivalue = PyInt_AsLong(defaultvalue);
+								} 
+								else // anything from str to tuple, dict, none
+								{
+									info->mArgs[i]->value->type = kString;
+									char *str = PyString_AsString(PyObject_Str(defaultvalue));
+									AllocateValueString_(ip, str, info->mArgs[i]->value);
 								}
-								else
+								Py_DECREF(defaultvalue);
+								
+							} else
+							{
+								// get the types by chopping after the underscore
+								char *temp = PyString_AsString(argname);
+								char *delims = "_";
+								char *result;
+								result = strtok( temp, delims );
+							
+								// ### CHECK THIS STRUCTURE
+								while( result != NULL )
 								{
-									//strcpy(gParamTypes[i],result);
-									if (strcmp(result,"str") == 0)
+									result = strtok( NULL, delims );
+									if (result == NULL)
 									{
-										gTypes[i] = 0;
+										break;
 									}
-									else if (strcmp(result,"int") == 0)
+									else
 									{
-										gTypes[i] = 1;
-									}
-									else if (strcmp(result,"flt") == 0)
-									{
-										gTypes[i] = 2;
+										if (strcmp(result,"int") == 0)
+										{
+											info->mArgs[i]->value->type = kInteger;
+											info->mArgs[i]->value->u.ivalue = 0;
+										}
+										else if (strcmp(result,"float") == 0)
+										{
+											info->mArgs[i]->value->type = kFloat;
+											info->mArgs[i]->value->u.fvalue = 0;
+										}
+										else if (strcmp(result,"bool") == 0)
+										{
+											info->mArgs[i]->value->type = kBoolean;
+											info->mArgs[i]->value->u.ivalue = 0;
+										}
+										else
+										{
+											info->mArgs[i]->value->type = kString;
+											char *str = "";
+											AllocateValueString_(ip, str, info->mArgs[i]->value);
+										}
 									}
 								}
 							}
-							Py_DECREF(list);
 							Py_DECREF(argname);
 						}
 						Py_DECREF(arglist);
+						Py_DECREF(defaults);
 					}
 					Py_DECREF(argspec_tuple);
 				}
@@ -665,7 +724,8 @@ FindPythonFunc(
 // ---------------------------------------------------------------------------------
 // Returns the length of the tuple
 static float
-CallPythonFunc( 
+CallPythonFunc(
+	IsadoraParameters*	ip,
 	PluginInfo* info )
 {
 	PyObject *pName, *pModule, *pDict, *pFunc = NULL, *pValue, *pArgs;
@@ -713,12 +773,12 @@ CallPythonFunc(
 		
 		for (i=0; i<info->mNumArgs; i++)
 		{
+			/*
 			int countFlt = 0;
 			int countInt = 0;
 			int countStr = 0;
 			if (gParamTypes[i] == "flt")
 			{
-				/*
 				double temp = (double)gParametersFlt[countFlt];			
 				pValue = PyFloat_FromDouble(temp);
 				PyTuple_SetItem(pArgs,i,pValue);
@@ -726,11 +786,9 @@ CallPythonFunc(
 				
 				 pValue = PyFloat_FromDouble(gParameters[i]);
 				 PyTuple_SetItem(pArgs,i,pValue);
-				 */
 			}
 			else if (gParamTypes[i] == "int")
 			{
-				/*
 				long temp = (long)gParametersInt[countInt];			
 				pValue = PyInt_FromLong(temp);
 				PyTuple_SetItem(pArgs,i,pValue);
@@ -738,11 +796,9 @@ CallPythonFunc(
 				
 				 pValue = PyInt_FromLong(gParameters[i]);
 				 PyTuple_SetItem(pArgs,i,pValue);
-				 */
 			}
 			else
 			{
-				/*
 				const char *temp = gParametersStr[countStr];			
 				pValue = PyString_FromString(temp);
 				PyTuple_SetItem(pArgs,i,pValue);
@@ -750,8 +806,8 @@ CallPythonFunc(
 				
 				 pValue = PyString_FromString(gParameters[i]);
 				 PyTuple_SetItem(pArgs,i,pValue);
-				 */
 			}
+			*/
 		}
 		
 		// Make the call to the function
@@ -822,7 +878,7 @@ HandlePropertyChangeValue(
 			if (info->mFuncFound)
 			{
 				// TODO: call function
-				CallPythonFunc(info);
+				CallPythonFunc(ip, info);
 
 				// Output trigger
 				Value fv;
@@ -901,7 +957,7 @@ HandlePropertyChangeValue(
 	if (findFunc) {
 		if (info->mFile != NULL && info->mFunc != NULL) {
 			// Find the function and number of parameters at the specified path
-			info->mNumArgs = FindPythonFunc(info);
+			info->mNumArgs = FindPythonFunc(ip, info);
 		} else {
 			info->mFuncFound = false;
 			info->mNumArgs = 0;
@@ -952,35 +1008,38 @@ static void AddArgInputProperties(
 					
 		while (delta-- > 0)
 		{
+			valueInit = *info->mArgs[count]->value;
 			// Here we have to check to see what type the input is
-			if (gTypes[count] == 0)
-			{
-				valueInit.type = kString;
-				AllocateValueString_(ip, "", &valueInit);
-							
+			if (valueInit.type == kString)
+			{							
 				GetPropertyMinMax_(ip, inActorInfo, kInputProperty, kInputPath, &valueMin, &valueMax, NULL);
 				availFmts = kDisplayFormatText;
 				curFmt = kDisplayFormatText;
 			}
-			else if (gTypes[count] == 1)
+			else if (valueInit.type == kInteger)
 			{
 				valueMin.type = kInteger;
 				valueMin.u.ivalue = -2147483647;
 				valueMax.type = kInteger;
 				valueMax.u.ivalue = 2147483647;
-				valueInit.type = kInteger;
-				valueInit.u.ivalue = 0;
 				availFmts = kDisplayFormatNumber;
 				curFmt = kDisplayFormatNumber;
 			}
-			else if (gTypes[count] == 2)
+			else if (valueInit.type == kBoolean)
+			{
+				valueMin.type = kBoolean;
+				valueMin.u.ivalue = 0;
+				valueMax.type = kBoolean;
+				valueMax.u.ivalue = 1;
+				availFmts = kDisplayFormatOnOff;
+				curFmt = kDisplayFormatOnOff;
+			}
+			else if (valueInit.type == kFloat)
 			{
 				valueMin.type = kFloat;
 				valueMin.u.fvalue = -2147483647;
 				valueMax.type = kFloat;
 				valueMax.u.fvalue = 2147483647;
-				valueInit.type = kFloat;
-				valueInit.u.fvalue = 0;
 				availFmts = kDisplayFormatNumber;
 				curFmt = kDisplayFormatNumber;
 			}
