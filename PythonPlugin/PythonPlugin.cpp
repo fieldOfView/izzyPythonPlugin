@@ -281,7 +281,7 @@ const char* sHelpStrings[] =
 	
 	"Triggered when the function has succesfully executed.",
 
-	"Outputs any error string returned by the python function. "
+	"Outputs any error string returned by the python function. ",
 
 	"Outputs data returned by the python function. "
 	"Note that this input is mutable: it changes its type to match the input property to which it is linked.",
@@ -573,7 +573,7 @@ FindPythonFunc(
 		}
 	}
 	
-	info->mFuncFound = (pFunc != NULL);
+	info->mFuncFound = (pFunc != NULL && PyCallable_Check(pFunc));
 	
 	pName = PyString_FromString("inspect");	
 	if (pName != NULL)
@@ -715,15 +715,18 @@ FindPythonFunc(
 //		 CallPythonFunc
 // ---------------------------------------------------------------------------------
 // Returns the length of the tuple
-static float
+static void
 CallPythonFunc(
 	IsadoraParameters*	ip,
-	PluginInfo* info )
+	ActorInfo* inActorInfo )
 {
 	PyObject *pName, *pModule, *pDict, *pFunc = NULL, *pValue, *pArgs;
+	Value val;
 	int i, size = 0;
 	float ret;
-	
+
+	PluginInfo* info = GetPluginInfo_(inActorInfo);
+
 	// Initialize the python interpreter
 	Py_Initialize();
 	
@@ -763,69 +766,85 @@ CallPythonFunc(
 		// Set the number of arguments
 		pArgs = PyTuple_New(info->mNumArgs);
 		
+		UInt32 propCount, argCount;
+		IzzyError err = GetPropertyCount_(ip, inActorInfo, kInputProperty, &propCount);
+	
+		argCount = propCount - (kInputArg0-1);
+	
 		for (i=0; i<info->mNumArgs; i++)
 		{
-			/*
-			int countFlt = 0;
-			int countInt = 0;
-			int countStr = 0;
-			if (gParamTypes[i] == "flt")
-			{
-				double temp = (double)gParametersFlt[countFlt];			
-				pValue = PyFloat_FromDouble(temp);
-				PyTuple_SetItem(pArgs,i,pValue);
-				countFlt++;
-				
-				 pValue = PyFloat_FromDouble(gParameters[i]);
-				 PyTuple_SetItem(pArgs,i,pValue);
-			}
-			else if (gParamTypes[i] == "int")
-			{
-				long temp = (long)gParametersInt[countInt];			
-				pValue = PyInt_FromLong(temp);
-				PyTuple_SetItem(pArgs,i,pValue);
-				countInt++;
-				
-				 pValue = PyInt_FromLong(gParameters[i]);
-				 PyTuple_SetItem(pArgs,i,pValue);
+			if (i<argCount) {
+				switch(info->mArgs[i]->value->type)
+				{
+				case kInteger:
+					pValue = PyInt_FromLong(info->mArgs[i]->value->u.ivalue);
+					break;
+				case kFloat:
+					pValue = PyFloat_FromDouble(info->mArgs[i]->value->u.fvalue);
+					break;
+				case kBoolean:
+					pValue = PyBool_FromLong(info->mArgs[i]->value->u.ivalue);
+					break;
+				case kString:
+					pValue = PyString_FromString(info->mArgs[i]->value->u.str->strData);
+					break;
+				}
 			}
 			else
 			{
-				const char *temp = gParametersStr[countStr];			
-				pValue = PyString_FromString(temp);
-				PyTuple_SetItem(pArgs,i,pValue);
-				countStr++;
-				
-				 pValue = PyString_FromString(gParameters[i]);
-				 PyTuple_SetItem(pArgs,i,pValue);
+				pValue = Py_None;			
 			}
-			*/
+			PyTuple_SetItem(pArgs,i,pValue);
+			Py_DECREF(pValue);
 		}
-		
 		// Make the call to the function
 		pValue = PyObject_CallObject(pFunc, pArgs);
+		Py_DECREF(pArgs);
 		
 		// Check for a return value and if its a tuple
-		if (pValue != NULL && PyTuple_Check(pValue))
+		if (pValue != NULL)
 		{
-			// get the number arguments
-			size = (int)PyObject_Size(pValue);
+			// Show result
+			val.type = kString;
+			AllocateValueString_(ip, PyString_AsString(PyObject_Str(pValue)), &val);
+			SetOutputPropertyValue_(ip, inActorInfo, kOutputResult, &val);
+			ReleaseValueString_(ip, &val);
 			
-			for ( i=0; i<size; i++)
-			{
-				//grab the list of parameters
-				PyObject *item = PyTuple_GetItem(pValue,i);
-				
-				item;
-			}
+			// Reset error output
+			val.type = kString;
+			AllocateValueString_(ip, "", &val);
+			SetOutputPropertyValue_(ip, inActorInfo, kOutputError, &val);
+			ReleaseValueString_(ip, &val);
+			
+			// Output trigger
+			val.type = kBoolean;
+			val.u.ivalue = 1;
+			SetOutputPropertyValue_(ip, inActorInfo, kOutputTrigger, &val);
+			
+			Py_DECREF(pValue);
 		}
-		
-		// Set return value
-		ret = (float)PyFloat_AsDouble(pValue);
-		
-		// Clean up
-		Py_DECREF(pArgs);
-		Py_DECREF(pValue);
+		else
+		{
+			PyObject *pErrType, *pErrValue, *pTraceback;
+			//pErrValue contains error message
+			//pTraceback contains stack snapshot and many other information
+			//(see python traceback structure)
+			
+			PyErr_Fetch(&pErrType, &pErrValue, &pTraceback);
+			
+			val.type = kString;
+			if (pErrValue != NULL)
+				AllocateValueString_(ip, PyString_AsString(pErrValue), &val);
+			else
+				AllocateValueString_(ip, "unspecified error", &val);
+			SetOutputPropertyValue_(ip, inActorInfo, kOutputError, &val);
+			ReleaseValueString_(ip, &val);
+			
+			Py_DECREF(pErrType);
+			Py_DECREF(pErrValue);
+			Py_DECREF(pTraceback);
+		}
+	
 	}
 	
 	// Clean up
@@ -833,8 +852,6 @@ CallPythonFunc(
 	
 	// Finish the Python Interpreter
 	Py_Finalize();
-	
-	return size;
 }
 	
 // ---------------------------------------------------------------------------------
@@ -869,14 +886,7 @@ HandlePropertyChangeValue(
 		case kInputTrigger:
 			if (info->mFuncFound)
 			{
-				// TODO: call function
-				CallPythonFunc(ip, info);
-
-				// Output trigger
-				Value fv;
-				fv.type = kBoolean;
-				fv.u.ivalue = 1;
-				SetOutputPropertyValue_(ip, inActorInfo, kOutputTrigger, &fv);
+				CallPythonFunc(ip, inActorInfo);
 			}
 			break;
 		
