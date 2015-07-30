@@ -1085,105 +1085,6 @@ static void ClearArgInputProperties(
 }
 
 // ---------------------------------------------------------------------------------
-//		? PropertyValueToString
-// ---------------------------------------------------------------------------------
-//	Converts PROPDEF parameters into more meaningful strings
-
-static Boolean PropValueCheck(IsadoraParameters* &ip, ValuePtr &inValue, char* &outString, UInt8 maxValues, char** sList){
-	if (inValue->u.ivalue >= 0 && inValue->u.ivalue <= maxValues-1) {
-		strcpy(outString, sList[inValue->u.ivalue]);
-	} else {
-		PluginAssert_(ip, false);
-	}
-	return true;
-}
-
-// ---------------------------------------------------------------------------------
-//		? PropertyStringToValue
-// ---------------------------------------------------------------------------------
-static Boolean PropStringCheck(IsadoraParameters* &ip, const char* &inString, ValuePtr &outValue, UInt8 maxValues, char** sList){
-	if (strlen(inString) == 1 && inString[0] >= '0' && inString[0] <= maxValues-1+'0') {
-		outValue->type = kInteger;
-		outValue->u.ivalue = (SInt32) inString[0] - '0';
-		return true;
-	} else {
-		SInt32 matchIndex = LookupPartialStringInList_(ip, maxValues, sList, inString);
-		if (matchIndex >= 0) {
-			outValue->type = kInteger;
-			outValue->u.ivalue = matchIndex;
-			return true;
-		}
-	}
-	return false;
-}
-
-
-// ---------------------------------------------------------------------------------
-//		¥ GetActorDefinedArea
-// ---------------------------------------------------------------------------------
-//	If the mGetActorDefinedAreaProc in the ActorInfo struct points to this function,
-//	it indicates to Isadora that the object would like to draw either an icon or else
-//	an graphic representation of its function.
-//
-//	### This function uses the 'PICT' 0 resource stored with the plugin to draw an icon.
-//  You should replace this picture (located in the Plugin Resources.rsrc file) with
-//  the icon for your actor.
-// 
-static ActorPictInfo	gPictInfo = { false, nil, nil, 0, 0 };
-
-static Boolean
-GetActorDefinedArea(
-	IsadoraParameters*			ip,			
-	ActorInfo*					inActorInfo,
-	SInt16*						outTopAreaWidth,			// returns the width to reserve for the top Actor Defined Area
-	SInt16*						outTopAreaMinHeight,		// returns the minimum height of the top area
-	SInt16*						outBotAreaHeight,			// returns the width to reserve for the bottom Actor Defined Area
-	SInt16*						outBotAreaMinWidth)			// returns the minimum width of the bottom area
-{
-	if (!gPictInfo.mInitialized) {
-		PrepareActorDefinedAreaPict_(ip, inActorInfo, 0, &gPictInfo);
-	}
-	
-	// place picture in top area
-	*outTopAreaWidth = gPictInfo.mWidth;
-	*outTopAreaMinHeight = gPictInfo.mHeight;
-	
-	// don't draw anything in bottom area
-	*outBotAreaHeight = 0;
-	*outBotAreaMinWidth = 0;
-	
-	return true;
-}
-
-// ---------------------------------------------------------------------------------
-//		¥ DrawActorDefinedArea
-// ---------------------------------------------------------------------------------
-//	If GetActorDefinedArea is defined, then this function will be called whenever
-//	your ActorDefinedArea needs to be drawn.
-//
-//	Beacuse we are using the PICT 0 resource stored with this plugin, we can use
-//	the DrawActorDefinedAreaPict_ supplied by the Isadora callbacks.
-//
-//  DrawActorDefinedAreaPict_ is Alpha Channel aware, so you can have nice
-//	shading if you like.
-
-static void
-DrawActorDefinedArea(
-	IsadoraParameters*			ip,
-	ActorInfo*					inActorInfo,
-	void*						/* inDrawingContext */,		// unused at present
-	ActorDefinedAreaPart		inActorDefinedAreaPart,		// the part of the actor that needs to be drawn
-	ActorAreaDrawFlagsT			/* inAreaDrawFlags */,		// actor draw flags
-	Rect*						inADAArea,					// rect enclosing the entire Actor Defined Area
-	Rect*						/* inUpdateArea */,			// subset of inADAArea that needs updating
-	Boolean						inSelected)					// TRUE if actor is currently selected
-{
-	if (inActorDefinedAreaPart == kActorDefinedAreaTop && gPictInfo.mInitialized) {
-		DrawActorDefinedAreaPict_(ip, inActorInfo, inSelected, inADAArea, &gPictInfo);
-	}
-}
-	
-// ---------------------------------------------------------------------------------
 //		¥ GetActorInfo
 // ---------------------------------------------------------------------------------
 //	This is function is called by to get the actor's class and ID, and to get
@@ -1213,7 +1114,7 @@ GetActorInfo(
 	
 	// OPTIONAL FUNCTIONS
 	outActorParams->mHandlePropertyConnectProc			= NULL;
-	outActorParams->mGetActorDefinedAreaProc			= GetActorDefinedArea;
-	outActorParams->mDrawActorDefinedAreaProc			= DrawActorDefinedArea;
+	outActorParams->mGetActorDefinedAreaProc			= NULL;
+	outActorParams->mDrawActorDefinedAreaProc			= NULL;
 	outActorParams->mMouseTrackInActorDefinedAreaProc	= NULL;
 }
