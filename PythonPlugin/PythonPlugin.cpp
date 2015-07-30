@@ -153,7 +153,6 @@ typedef struct {
 	char*				mPath;
 	char*				mFile;
 	char*				mFunc;
-	bool				mLoadArgs;
 	
 	int					mNumArgs;
 	bool				mFuncFound;
@@ -929,11 +928,9 @@ HandlePropertyChangeValue(
 			
 		case kInputParams:
 		{
-			info->mLoadArgs = inNewValue->u.ivalue;
-			
-			if ( info->mFuncFound )
+			if ( inNewValue->u.ivalue )
 			{
-				if ( info->mLoadArgs == 1 )
+				if ( inNewValue->u.ivalue == 1 )
 				{
 					AddArgInputProperties(ip, inActorInfo);
 				}
