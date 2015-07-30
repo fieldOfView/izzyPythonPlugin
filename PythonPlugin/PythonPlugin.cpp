@@ -287,14 +287,6 @@ const char* sHelpStrings[] =
 	"Note that this input is mutable: it changes its type to match the input property to which it is linked.",
 };
 
-// * User Constants
-const UInt32	kFixedInputValues	= 0;
-const UInt32	kFixedOutputValues	= 0;
-
-// Do not need these
-const SInt16	kAcrossLineWidth	= 15;
-const SInt16	kLineWidth			= 2;
-const SInt16	kSwitchAreaWidth	= kAcrossLineWidth * 2;
 // ---------------------------------------------------------------------------------
 //		¥ CreateActor
 // ---------------------------------------------------------------------------------
@@ -1009,6 +1001,8 @@ static void AddArgInputProperties(
 		while (delta-- > 0)
 		{
 			valueInit = *info->mArgs[count]->value;
+			valueMin.type = valueInit.type;
+			valueMax.type = valueInit.type;
 			// Here we have to check to see what type the input is
 			if (valueInit.type == kString)
 			{							
@@ -1018,27 +1012,21 @@ static void AddArgInputProperties(
 			}
 			else if (valueInit.type == kInteger)
 			{
-				valueMin.type = kInteger;
 				valueMin.u.ivalue = -2147483647;
-				valueMax.type = kInteger;
 				valueMax.u.ivalue = 2147483647;
 				availFmts = kDisplayFormatNumber;
 				curFmt = kDisplayFormatNumber;
 			}
 			else if (valueInit.type == kBoolean)
 			{
-				valueMin.type = kBoolean;
 				valueMin.u.ivalue = 0;
-				valueMax.type = kBoolean;
 				valueMax.u.ivalue = 1;
 				availFmts = kDisplayFormatOnOff;
 				curFmt = kDisplayFormatOnOff;
 			}
 			else if (valueInit.type == kFloat)
 			{
-				valueMin.type = kFloat;
 				valueMin.u.fvalue = -2147483647;
-				valueMax.type = kFloat;
 				valueMax.u.fvalue = 2147483647;
 				availFmts = kDisplayFormatNumber;
 				curFmt = kDisplayFormatNumber;
@@ -1068,11 +1056,6 @@ static void AddArgInputProperties(
 			changeableOutputCount++;
 			count++;
 		}
-					
-		if (valueInit.type == kString)
-		{
-			ReleaseValueString_(ip, &valueInit);
-		}
 	}
 }
 
@@ -1080,24 +1063,20 @@ static void ClearArgInputProperties(
 	IsadoraParameters*	ip,
 	ActorInfo*			inActorInfo) 
 {
-	PluginInfo* info = GetPluginInfo_(inActorInfo);
-
-	// TODO: keep count in AddArgInputProperties, and remove only those,
-	// instead of relying on gNumArgs which might have changed.
-	UInt32 propCount;
+	UInt32 propCount, argCount;
 	IzzyError err = GetPropertyCount_(ip, inActorInfo, kInputProperty, &propCount);
-				
+
+	argCount = propCount - (kInputArg0-1);
 	// Remove unwanted params
-	if (info->mNumArgs > 0)
+	if (argCount > 0)
 	{
-		unsigned int index = (kInputArg0-1) + info->mNumArgs;
+		unsigned int index = propCount;
 		int i;
-		for (i=0; i<info->mNumArgs; i++)
+		for (i=0; i<argCount; i++)
 		{
-			if(index <= propCount) {
-				err = RemovePropertyProc_(ip, inActorInfo, kInputProperty, index);
-				PluginAssert_(ip, err == noErr);
-			}
+			err = RemovePropertyProc_(ip, inActorInfo, kInputProperty, index);
+			PluginAssert_(ip, err == noErr);
+
 			index--;
 		}
 	}
