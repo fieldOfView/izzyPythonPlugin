@@ -543,7 +543,7 @@ FindPythonFunc(
 	Py_Initialize();
 	
 	// Make sure we are getting the module from the correct place
-	if(info->mPath != NULL)
+	if(info->mPath != NULL && strlen(info->mPath) > 0)
 	{
 		char *buffer = (char*)malloc( strlen(info->mPath)+25 );
 		sprintf(buffer, "sys.path.append(\"%s\")", info->mPath);
@@ -597,7 +597,6 @@ FindPythonFunc(
 						size = (int)PyObject_Size(arglist);
 						
 						int defaults_offset = (int)PyObject_Size(defaults) - size;
-						Py_DECREF(defaults);
 						
 						//allocate memory for properties
 						info->mArgs = (Property**)malloc(size * sizeof(Property));
@@ -646,8 +645,6 @@ FindPythonFunc(
 									char *str = PyString_AsString(PyObject_Str(defaultvalue));
 									AllocateValueString_(ip, str, info->mArgs[i]->value);
 								}
-								Py_DECREF(defaultvalue);
-								
 							} else
 							{
 								// get the types by chopping after the underscore
@@ -731,7 +728,7 @@ CallPythonFunc(
 	Py_Initialize();
 	
 	// Make sure we are getting the module from the correct place
-	if(info->mPath != NULL)
+	if(info->mPath != NULL && strlen(info->mPath) > 0)
 	{
 		char *buffer = (char*)malloc( strlen(info->mPath)+25 );
 		sprintf(buffer, "sys.path.append(\"%s\")", info->mPath);
@@ -957,7 +954,7 @@ HandlePropertyChangeValue(
 	}
 
 	if (findFunc) {
-		if (info->mFile != NULL && info->mFunc != NULL) {
+		if (info->mFile != NULL && strlen(info->mFile) > 0 && info->mFunc != NULL && strlen(info->mFunc) > 0) {
 			// Find the function and number of parameters at the specified path
 			info->mNumArgs = FindPythonFunc(ip, info);
 		} else {
