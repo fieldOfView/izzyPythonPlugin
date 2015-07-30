@@ -949,7 +949,7 @@ HandlePropertyChangeValue(
 	}
 
 	if (findFunc) {
-		if (info->mFile != NULL && strlen(info->mFile) > 0 && info->mFunc != NULL && strlen(info->mFunc) > 0) {
+		if (info->mFile != NULL && info->mFunc != NULL) {
 			// Find the function and number of parameters at the specified path
 			info->mNumArgs = FindPythonFunc(ip, info);
 		} else {
