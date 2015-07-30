@@ -770,19 +770,20 @@ CallPythonFunc(
 		for (i=0; i<info->mNumArgs; i++)
 		{
 			if (i<argCount) {
+				Value *val = GetInputPropertyValue_(ip, inActorInfo, kInputArg0 + i);
 				switch(info->mArgs[i]->value->type)
 				{
 				case kInteger:
-					PyTuple_SetItem(pArgs, i, PyInt_FromLong(info->mArgs[i]->value->u.ivalue));
+					PyTuple_SetItem(pArgs, i, PyInt_FromLong(val->u.ivalue));
 					break;
 				case kFloat:
-					PyTuple_SetItem(pArgs, i, PyFloat_FromDouble(info->mArgs[i]->value->u.fvalue));
+					PyTuple_SetItem(pArgs, i, PyFloat_FromDouble(val->u.fvalue));
 					break;
 				case kBoolean:
-					PyTuple_SetItem(pArgs, i, PyBool_FromLong(info->mArgs[i]->value->u.ivalue));
+					PyTuple_SetItem(pArgs, i, PyBool_FromLong(val->u.ivalue));
 					break;
 				case kString:
-					PyTuple_SetItem(pArgs, i, PyString_FromString(info->mArgs[i]->value->u.str->strData));
+					PyTuple_SetItem(pArgs, i, PyString_FromString(val->u.str->strData));
 					break;
 				}
 			}
@@ -972,15 +973,6 @@ static void AddArgInputProperties(
 {
 	PluginInfo* info = GetPluginInfo_(inActorInfo);
 	int delta = info->mNumArgs;
-
-	/*
-	// Output test string
-	Value v;
-	v.type = kString;
-	AllocateValueString_(ip, "test", &v);
-	SetOutputPropertyValue_(ip, inActorInfo, kOutputResult, &v);
-	ReleaseValueString_(ip, &v);
-	*/
 
 	// Dynamically change inputs of actor
 	UInt32 propCount;
