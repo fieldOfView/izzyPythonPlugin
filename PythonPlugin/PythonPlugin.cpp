@@ -300,7 +300,7 @@ CreateActor(
 	IsadoraParameters*	ip,	
 	ActorInfo*			ioActorInfo)		// pointer to this actor's ActorInfo struct - unique to each instance of an actor
 {
-	// creat the PluginInfo struct - initializing it to all zeroes
+	// create the PluginInfo struct - initializing it to all zeroes
 	PluginInfo* info = (PluginInfo*) IzzyMallocClear_(ip, sizeof(PluginInfo));
 	PluginAssert_(ip, info != nil);
 	
@@ -774,25 +774,23 @@ CallPythonFunc(
 				switch(info->mArgs[i]->value->type)
 				{
 				case kInteger:
-					pValue = PyInt_FromLong(info->mArgs[i]->value->u.ivalue);
+					PyTuple_SetItem(pArgs, i, PyInt_FromLong(info->mArgs[i]->value->u.ivalue));
 					break;
 				case kFloat:
-					pValue = PyFloat_FromDouble(info->mArgs[i]->value->u.fvalue);
+					PyTuple_SetItem(pArgs, i, PyFloat_FromDouble(info->mArgs[i]->value->u.fvalue));
 					break;
 				case kBoolean:
-					pValue = PyBool_FromLong(info->mArgs[i]->value->u.ivalue);
+					PyTuple_SetItem(pArgs, i, PyBool_FromLong(info->mArgs[i]->value->u.ivalue));
 					break;
 				case kString:
-					pValue = PyString_FromString(info->mArgs[i]->value->u.str->strData);
+					PyTuple_SetItem(pArgs, i, PyString_FromString(info->mArgs[i]->value->u.str->strData));
 					break;
 				}
 			}
 			else
 			{
-				pValue = Py_None;			
+				PyTuple_SetItem(pArgs, i, Py_None);
 			}
-			PyTuple_SetItem(pArgs,i,pValue);
-			Py_DECREF(pValue);
 		}
 		// Make the call to the function
 		pValue = PyObject_CallObject(pFunc, pArgs);
