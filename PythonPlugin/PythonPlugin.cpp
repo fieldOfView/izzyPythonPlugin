@@ -647,8 +647,10 @@ FindPythonFunc(
 								else // anything from str to tuple, dict, none
 								{
 									info->mArgs[i]->value->type = kString;
-									char *str = PyString_AsString(PyObject_Str(defaultvalue));
+									PyObject *pStr = PyObject_Str(defaultvalue);
+									char *str = PyString_AsString(pStr);
 									AllocateValueString_(ip, str, info->mArgs[i]->value);
+									Py_DECREF(pStr);
 								}
 							}
 							else
@@ -768,7 +770,7 @@ CallPythonFunc(
 		{
 			if (i < argCount) {
 				Value *val = GetInputPropertyValue_(ip, inActorInfo, kInputArg0 + i);
-				switch(info->mArgs[i]->value->type)
+				switch(val->type)
 				{
 				case kInteger:
 					PyTuple_SetItem(pArgs, i, PyInt_FromLong(val->u.ivalue));
@@ -797,9 +799,11 @@ CallPythonFunc(
 		{
 			// Show result
 			val.type = kString;
-			AllocateValueString_(ip, PyString_AsString(PyObject_Str(pValue)), &val);
+			PyObject *pStr = PyObject_Str(pValue);
+			AllocateValueString_(ip, PyString_AsString(pStr), &val);
 			SetOutputPropertyValue_(ip, inActorInfo, kOutputResult, &val);
 			ReleaseValueString_(ip, &val);
+			Py_DECREF(pStr);
 			
 			// Reset error output
 			val.type = kString;
