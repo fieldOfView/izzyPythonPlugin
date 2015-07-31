@@ -1,31 +1,29 @@
-// ===========================================================================
-//	Isadora Python Plugin							©2015 Aldo Hooeben,
-//													©2001 Mark F. Coniglio.
-//													All rights reserved.
-// ===========================================================================
+// =================================================================================
+//	Isadora Python Plugin
+// =================================================================================
 //
-//	Based on ExecutePythonFunction.cpp ©2001 Mark F. Coniglio.
+//	Based on ExecutePythonFunction.cp ©2001, 
+//  and template output ©2003 Mark F. Coniglio.
 //
-//	IMPORTANT: This source code ("the software") is supplied to you in
-//	consideration of your agreement to the following terms. If you do not
-//	agree to the terms, do not install, use, modify or redistribute the
-//	software.
+//  Copyright (c) 2001,2003 Mark F. Coniglio, 2015 Aldo Hoeben
 //
-//	Mark Coniglio (dba TroikaTronix) grants you a personal, non exclusive
-//	license to use, reproduce, modify this software with and to redistribute it,
-//	with or without modifications, in source and/or binary form. Except as
-//	expressly stated in this license, no other rights are granted, express
-//	or implied, to you by TroikaTronix.
-//
-//	This software is provided on an "AS IS" basis. TroikaTronix makes no
-//	warranties, express or implied, including without limitation the implied
-//	warranties of non-infringement, merchantability, and fitness for a
-//	particular purpurse, regarding this software or its use and operation
-//	alone or in combination with your products.
-//
-//	In no event shall TroikaTronix be liable for any special, indirect, incidental,
-//	or consequential damages arising in any way out of the use, reproduction,
-//	modification and/or distribution of this software.
+//	Permission is hereby granted, free of charge, to any person obtaining a copy
+//	of this software and associated documentation files (the "Software"), to deal
+//	in the Software without restriction, including without limitation the rights
+//	to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+//	copies of the Software, and to permit persons to whom the Software is
+//	furnished to do so, subject to the following conditions:
+//	
+//	The above copyright notice and this permission notice shall be included in
+//	all copies or substantial portions of the Software.
+//	
+//	THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+//	IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+//	FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+//	AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+//	LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+//	OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
+//	THE SOFTWARE.
 //
 
 // ---------------------------------------------------------------------------------
