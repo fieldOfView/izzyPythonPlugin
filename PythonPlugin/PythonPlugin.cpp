@@ -334,7 +334,7 @@ DisposeActor(
 	if (info->mArgs != NULL)
 	{
 		int i, size;
-		size = sizeof(info->mArgs);
+		size = info->mNumArgs;
 		for (i=0; i<size; i++)
 		{
 			free(info->mArgs[i]->name);
@@ -531,7 +531,7 @@ FindPythonFunc(
 	if (info->mArgs != NULL)
 	{
 		// free memory for previously created args
-		size = sizeof(info->mArgs);
+		size = info->mNumArgs;
 		for (i=0; i<size; i++)
 		{
 			free(info->mArgs[i]->name);
