@@ -515,9 +515,8 @@ CreatePropertyID(
 // ---------------------------------------------------------------------------------
 //		 FindPythonFunc
 // ---------------------------------------------------------------------------------
-// Returns the number of arguments of the specified function
 
-static int
+static void
 FindPythonFunc(
 	IsadoraParameters*	ip,
 	PluginInfo* info )
@@ -532,7 +531,6 @@ FindPythonFunc(
 	if (info->mArgs != NULL)
 	{
 		// free memory for previously created args
-		int i, size;
 		size = sizeof(info->mArgs);
 		for (i=0; i<size; i++)
 		{
@@ -546,7 +544,14 @@ FindPythonFunc(
 		}
 		free(info->mArgs);
 		info->mArgs = NULL;
+		size = 0;
 	}
+
+	info->mFuncFound = false;
+	info->mNumArgs = 0;
+
+	if (info->mFile == NULL || strlen(info->mFile) == 0 || info->mFunc == NULL || strlen(info->mFunc) == 0)
+		return;
 
 	// Initialize the python interpreter
 	Py_Initialize();
@@ -698,11 +703,12 @@ FindPythonFunc(
 			}			
 		}
 	}
-	
+	info->mNumArgs = size;
+
 	// Finish the Python Interpreter
 	Py_Finalize();
 	
-	return size;
+	return;
 }
 
 // ---------------------------------------------------------------------------------
@@ -926,16 +932,7 @@ HandlePropertyChangeValue(
 
 	if (findFunc)
 	{
-		if (info->mFile != NULL && strlen(info->mFile) > 0 && info->mFunc != NULL && strlen(info->mFunc) > 0)
-		{
-			// Find the function and number of parameters at the specified path
-			info->mNumArgs = FindPythonFunc(ip, info);
-		}
-		else
-		{
-			info->mFuncFound = false;
-			info->mNumArgs = 0;
-		}
+		FindPythonFunc(ip, info);
 				
 		// Output a boolean showing if the function was found
 		Value fv;
