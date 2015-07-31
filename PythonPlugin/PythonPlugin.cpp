@@ -1,10 +1,10 @@
 // ===========================================================================
 //	Isadora Python Plugin							©2015 Aldo Hooeben,
-//													©2003 Mark F. Coniglio. 
+//													©2001 Mark F. Coniglio.
 //													All rights reserved.
 // ===========================================================================
 //
-//	Based on ExecutePythonFunction.cpp ©2003 Mark F. Coniglio.
+//	Based on ExecutePythonFunction.cpp ©2001 Mark F. Coniglio.
 //
 //	IMPORTANT: This source code ("the software") is supplied to you in
 //	consideration of your agreement to the following terms. If you do not
@@ -19,7 +19,7 @@
 //
 //	This software is provided on an "AS IS" basis. TroikaTronix makes no
 //	warranties, express or implied, including without limitation the implied
-//	warranties of non-infringement, merchantability, and fitness for a 
+//	warranties of non-infringement, merchantability, and fitness for a
 //	particular purpurse, regarding this software or its use and operation
 //	alone or in combination with your products.
 //
@@ -123,13 +123,13 @@ ClearArgInputProperties(
 // ---------------------------------------------------------------------------------
 // GLOBAL VARIABLES
 // ---------------------------------------------------------------------------------
-// ### Declare global variables, common to all instantiations of this plugin here
+// Declare global variables, common to all instantiations of this plugin here
 
 
 // ---------------------------------------------------------------------------------
 // Property struct
 // ---------------------------------------------------------------------------------
-// This structure is used to store property names, types and values in the 
+// This structure is used to store property names, types and values in the
 // PluginInfo struct.
 
 struct Property {
@@ -140,7 +140,7 @@ struct Property {
 // ---------------------------------------------------------------------------------
 // PluginInfo struct
 // ---------------------------------------------------------------------------------
-// ### This structure neeeds to contain all variables used by your plugin. Memory for
+// This structure needs to contain all variables used by your plugin. Memory for
 // this struct is allocated during the CreateActor function, and disposed during
 // the DisposeActor function, and is private to each copy of the plugin.
 //
@@ -154,7 +154,7 @@ typedef struct {
 	char*				mFile;
 	char*				mFunc;
 	
-	int					mNumArgs;
+	unsigned int		mNumArgs;
 	bool				mFuncFound;
 
 	Property**			mArgs;
@@ -172,13 +172,13 @@ typedef struct {
 // ---------------------------------------------------------------------------------
 //	Defines various constants used throughout the plugin.
 
-// ### GROUP ID
+// GROUP ID
 // Define the group under which this plugin will be displayed in the Isadora interface.
 // These are defined under "Actor Types" in IsadoraTypes.h
 
 static const OSType	kActorClass 	= kGroupControl;
 
-// ### PLUGIN IN
+// PLUGIN IN
 // Define the plugin's unique four character identifier. Contact TroikaTronix to
 // obtain a unique four character code if you want to ensure that someone else
 // has not developed a plugin with the same code. Note that TroikaTronix reserves
@@ -187,12 +187,12 @@ static const OSType	kActorClass 	= kGroupControl;
 
 static const OSType	kActorID		= FOUR_CHAR_CODE('0OtC');
 
-// ### ACTOR NAME
+// ACTOR NAME
 // The name of the actor. This is the name that will be shown in the User Interface.
 
 static const char* kActorName		= "PythonPlugin";
 
-// ### PROPERTY DEFINITION STRING
+// PROPERTY DEFINITION STRING
 // The property string. This string determines the inputs and outputs for your plugin.
 // See the IsadoraCallbacks.h under the heading "PROPERTY DEFINITION STRING" for the
 // meaning ofthese codes. (The IsadoraCallbacks.h header can be seen by opening up
@@ -222,10 +222,10 @@ static const char* sPropertyDefinitionString =
 	"OUTPROP	error			err		string		text				*		*		\r"
 	"OUTPROP	output			out		string		text				*		*		\r";
 
-// ### Property Index Constants
+// Property Index Constants
 // Properties are referenced by a one-based index. The first input property will
 // be 1, the second 2, etc. Similarly, the first output property starts at 1.
-// You whould have one constant for each input and output property defined in the 
+// You whould have one constant for each input and output property defined in the
 // property definition string.
 
 enum
@@ -247,7 +247,7 @@ enum
 // ---------------------
 //	Help String
 // ---------------------
-// ### Help Strings
+// Help Strings
 //
 // The first help string is for the actor in general. This followed by help strings
 // for all of the inputs, and then by the help strings for all of the outputs. These
@@ -264,7 +264,7 @@ const char* sHelpStrings[] =
 	"Finds a python function and performs the operation.",
 	
 	"Triggers execution of the function, if the function can be found.",
-
+	
 	"Specifies the directory of the python module. Can be left blank if the module is in the PYHTONPATH.",
 	
 	"Specifies a python module within the selected directory or within PYTHONPATH.",
@@ -275,13 +275,13 @@ const char* sHelpStrings[] =
 	
 	"Argument for the python function. "
 	"Note that this input is mutable: it changes its type to match the output property to which it is linked.",
-
+	
 	"Set to 'on' if the specified python function was found.",
 	
 	"Triggered when the function has succesfully executed.",
-
+	
 	"Outputs any error string returned by the python function. ",
-
+	
 	"Outputs data returned by the python function. "
 	"Note that this input is mutable: it changes its type to match the input property to which it is linked.",
 };
@@ -325,7 +325,7 @@ DisposeActor(
 	PluginInfo* info = GetPluginInfo_(ioActorInfo);
 	PluginAssert_(ip, info != nil);
 	
-	// ### destruction of private member variables
+	// destruction of private member variables
 	if (info->mPath != NULL)
 		free(info->mPath);
 	if (info->mFile != NULL)
@@ -337,7 +337,7 @@ DisposeActor(
 	{
 		int i, size;
 		size = sizeof(info->mArgs);
-		for ( i=0; i<size; i++)
+		for (i=0; i<size; i++)
 		{
 			free(info->mArgs[i]->name);
 			if (info->mArgs[i]->value->type == kString)
@@ -372,7 +372,8 @@ ActivateActor(
 	// ------------------------
 	// ACTIVATE
 	// ------------------------
-	if (inActivate) {
+	if (inActivate)
+	{
 	
 		// Isadora passes various messages to plugins that request them.
 		// These include Mouse Moved messages, Key Down/Key Up messages,
@@ -389,7 +390,9 @@ ActivateActor(
 	// DEACTIVATE
 	// ------------------------
 	
-	} else {
+	}
+	else
+	{
 	
 	}
 }
@@ -429,20 +432,19 @@ GetHelpString(
 	// if the input the user is asking about is
 	// past the end of the fixed properties, then
 	// we force it to the first variable property
-	if (inPropertyType == kInputProperty) {
-		if (inPropertyIndex1 >= kInputArg0) {
+	if (inPropertyType == kInputProperty)
+	{
+		if (inPropertyIndex1 >= kInputArg0)
 			inPropertyIndex1 = kInputArg0;
-		}
-	} 
+	}
 	
 	// The PropertyTypeAndIndexToHelpIndex_ converts the inPropertyType and
 	// inPropertyIndex1 parameters to determine the zero-based index into
 	// your list of help strings.
 	UInt32 index1 = PropertyTypeAndIndexToHelpIndex_(ip, inActorInfo, inPropertyType, inPropertyIndex1);
 	
-	if (inPropertyType == kOutputProperty) {
+	if (inPropertyType == kOutputProperty)
 		index1 = kInputArg0+inPropertyIndex1;
-	}
 
 	// get the help string
 	helpstr = sHelpStrings[index1];
@@ -452,7 +454,7 @@ GetHelpString(
 }
 
 // ---------------------------------------------------------------------------------
-//		? CreatePropertyID	[INTERRUPT SAFE]
+//		¥ CreatePropertyID	[INTERRUPT SAFE]
 // ---------------------------------------------------------------------------------
 
 inline OSType
@@ -474,16 +476,17 @@ CreatePropertyID(
 	SInt32 indexOffset;
 	
 	// in index is between 00 and 99
-	if (inIndex >= 0 && inIndex < 100) {
-		
+	if (inIndex >= 0 && inIndex < 100)
+	{	
 		indexMS = inIndex / 10;
 		indexLS = inIndex % 10;
 		
 		result |= ( (((UInt32) (indexMS + '0')) << 8) | (((UInt32) (indexLS + '0')) << 0) );
 		
 		// if between 100 and 776
-	} else if (inIndex >= 100 && inIndex < 100 + kTwoCharMax) {
-		
+	}
+	else if (inIndex >= 100 && inIndex < 100 + kTwoCharMax)
+	{	
 		indexOffset = inIndex - 100;
 		PluginAssert_(ip, indexOffset >= 0 && indexOffset < kTwoCharMax);
 		indexMS = indexOffset / kOneCharMax;
@@ -492,8 +495,9 @@ CreatePropertyID(
 		result |= ( (((UInt32) (indexMS + 'A')) << 8) | (((UInt32) (indexLS + 'A')) << 0) );
 		
 		// if between 776 and 1452
-	} else if (inIndex >= 100 + kTwoCharMax && inIndex < 100 + kTwoCharMax * 2) {
-		
+	}
+	else if (inIndex >= 100 + kTwoCharMax && inIndex < 100 + kTwoCharMax * 2)
+	{	
 		indexOffset = inIndex - (100 + kTwoCharMax);
 		PluginAssert_(ip, indexOffset >= 0 && indexOffset < kTwoCharMax);
 		indexMS = indexOffset / kOneCharMax;
@@ -501,7 +505,9 @@ CreatePropertyID(
 		
 		result |= ( (((UInt32) (indexMS + 'a')) << 8) | (((UInt32) (indexLS + 'a')) << 0) );
 		
-	} else {
+	}
+	else
+	{
 		PluginAssert_(ip, false);
 	}
 	
@@ -511,6 +517,8 @@ CreatePropertyID(
 // ---------------------------------------------------------------------------------
 //		 FindPythonFunc
 // ---------------------------------------------------------------------------------
+// Returns the number of arguments of the specified function
+
 static int
 FindPythonFunc(
 	IsadoraParameters*	ip,
@@ -519,12 +527,16 @@ FindPythonFunc(
 	PyObject *pName, *pModule, *pDict, *pFunc = NULL, *pInspect, *argspec_tuple, *arglist, *defaults, *defaultvalue;
 	int size = 0, i;
 	
+	// NB: PyObjects returned by PyObject_*, PyNumber_*, PySequence_* or PyMapping_* functions must 
+	// be dererefereced using Py_DECREF, PyObjects returned by PyString_*, PyTuple_* etc must not!
+	// See https://docs.python.org/2/c-api/intro.html#reference-counts
+	
 	if (info->mArgs != NULL)
 	{
 		// free memory for previously created args
 		int i, size;
 		size = sizeof(info->mArgs);
-		for ( i=0; i<size; i++)
+		for (i=0; i<size; i++)
 		{
 			free(info->mArgs[i]->name);
 			if (info->mArgs[i]->value->type == kString)
@@ -542,7 +554,7 @@ FindPythonFunc(
 	Py_Initialize();
 	
 	// Make sure we are getting the module from the correct place
-	if(info->mPath != NULL && strlen(info->mPath) > 0)
+	if (info->mPath != NULL && strlen(info->mPath) > 0)
 	{
 		char *buffer = (char*)malloc( strlen(info->mPath)+25 );
 		sprintf(buffer, "sys.path.append(\"%s\")", info->mPath);
@@ -560,11 +572,9 @@ FindPythonFunc(
 		pModule = PyImport_Import(pName);
 		if (pModule != NULL)
 		{
-			// pDict is a borrowed reference
 			pDict = PyModule_GetDict(pModule);
 			if (pDict != NULL)
 			{
-				// pFunc is a borrowed reference
 				pFunc = PyDict_GetItemString(pDict, info->mFunc);
 			}
 		}
@@ -596,7 +606,7 @@ FindPythonFunc(
 						//allocate memory for properties
 						info->mArgs = (Property**)malloc(size * sizeof(Property));
 						
-						for ( i=0; i<size; i++)
+						for (i=0; i<size; i++)
 						{
 							//grab the list of parameters
 							PyObject *list = PyList_GetItem(arglist,i);
@@ -614,47 +624,46 @@ FindPythonFunc(
 							
 							//try to deduce the argument type
 							
-							if (i+defaults_offset >= 0) {
+							if (i + defaults_offset >= 0) {
 								//first check if there is a default value we can use
 								defaultvalue = PyTuple_GetItem(defaults, i+defaults_offset);
-								const char* type = defaultvalue->ob_type->tp_name; 
-								if( strcmp(type, "int") == 0 )
+								const char* type = defaultvalue->ob_type->tp_name;
+								
+								if (strcmp(type, "int") == 0)
 								{
 									info->mArgs[i]->value->type = kInteger;
 									info->mArgs[i]->value->u.ivalue = PyInt_AsLong(defaultvalue);
-								} 
-								else if( strcmp(type, "float") == 0 )
+								}
+								else if (strcmp(type, "float") == 0)
 								{
 									info->mArgs[i]->value->type = kFloat;
-									info->mArgs[i]->value->u.fvalue = PyFloat_AsDouble(defaultvalue);
-								} 
-								else if( strcmp(type, "bool") == 0 )
+									info->mArgs[i]->value->u.fvalue = (float)PyFloat_AsDouble(defaultvalue);
+								}
+								else if (strcmp(type, "bool") == 0)
 								{
 									info->mArgs[i]->value->type = kBoolean;
 									info->mArgs[i]->value->u.ivalue = PyInt_AsLong(defaultvalue);
-								} 
+								}
 								else // anything from str to tuple, dict, none
 								{
 									info->mArgs[i]->value->type = kString;
 									char *str = PyString_AsString(PyObject_Str(defaultvalue));
 									AllocateValueString_(ip, str, info->mArgs[i]->value);
 								}
-							} else
+							}
+							else
 							{
 								// get the types by chopping after the underscore
 								char *temp = PyString_AsString(argname);
 								char *delims = "_";
 								char *result;
 								result = strtok( temp, delims );
-							
-								// ### CHECK THIS STRUCTURE
-								while( result != NULL )
+								
+								while (result != NULL)
 								{
 									result = strtok( NULL, delims );
 									if (result == NULL)
-									{
 										break;
-									}
 									else
 									{
 										if (strcmp(result,"int") == 0)
@@ -699,7 +708,7 @@ FindPythonFunc(
 // ---------------------------------------------------------------------------------
 //		 CallPythonFunc
 // ---------------------------------------------------------------------------------
-// Returns the length of the tuple
+
 static void
 CallPythonFunc(
 	IsadoraParameters*	ip,
@@ -707,16 +716,19 @@ CallPythonFunc(
 {
 	PyObject *pName, *pModule, *pDict, *pFunc = NULL, *pValue, *pArgs;
 	Value val;
-	int i, size = 0;
-	float ret;
-
+	unsigned int i, size = 0;
+	
+	// NB: PyObjects returned by PyObject_*, PyNumber_*, PySequence_* or PyMapping_* functions must 
+	// be dererefereced using Py_DECREF, PyObjects returned by PyString_*, PyTuple_* etc must not!
+	// See https://docs.python.org/2/c-api/intro.html#reference-counts
+	
 	PluginInfo* info = GetPluginInfo_(inActorInfo);
 
 	// Initialize the python interpreter
 	Py_Initialize();
 	
 	// Make sure we are getting the module from the correct place
-	if(info->mPath != NULL && strlen(info->mPath) > 0)
+	if (info->mPath != NULL && strlen(info->mPath) > 0)
 	{
 		char *buffer = (char*)malloc( strlen(info->mPath)+25 );
 		sprintf(buffer, "sys.path.append(\"%s\")", info->mPath);
@@ -734,11 +746,9 @@ CallPythonFunc(
 		pModule = PyImport_Import(pName);
 		if (pModule != NULL)
 		{
-			// pDict is a borrowed reference
 			pDict = PyModule_GetDict(pModule);
 			if (pDict != NULL)
 			{
-				// pFunc is a borrowed reference
 				pFunc = PyDict_GetItemString(pDict, info->mFunc);
 			}
 		}
@@ -756,7 +766,7 @@ CallPythonFunc(
 	
 		for (i=0; i<info->mNumArgs; i++)
 		{
-			if (i<argCount) {
+			if (i < argCount) {
 				Value *val = GetInputPropertyValue_(ip, inActorInfo, kInputArg0 + i);
 				switch(info->mArgs[i]->value->type)
 				{
@@ -830,7 +840,7 @@ CallPythonFunc(
 // ---------------------------------------------------------------------------------
 //		¥ HandlePropertyChangeValue	[INTERRUPT SAFE]
 // ---------------------------------------------------------------------------------
-//	### This function is called whenever one of the input values of an actor changes.
+//	This function is called whenever one of the input values of an actor changes.
 //	The one-based property index of the input is given by inPropertyIndex1.
 //	The new value is given by inNewValue, the previous value by inOldValue.
 //
@@ -845,10 +855,6 @@ HandlePropertyChangeValue(
 {
 	PluginInfo* info = GetPluginInfo_(inActorInfo);
 
-	// ### When you add/change/remove properties, you will need to add cases
-	// to this switch statement, to process the messages for your
-	// input properties
-	
 	bool findFunc = false;
 	
 	Value outputValue;
@@ -858,9 +864,7 @@ HandlePropertyChangeValue(
 		
 		case kInputTrigger:
 			if (info->mFuncFound)
-			{
 				CallPythonFunc(ip, inActorInfo);
-			}
 			break;
 		
 		case kInputPath:
@@ -907,9 +911,9 @@ HandlePropertyChangeValue(
 			
 		case kInputParams:
 		{
-			if ( inNewValue->u.ivalue )
+			if (inNewValue->u.ivalue)
 			{
-				if ( inNewValue->u.ivalue == 1 )
+				if (inNewValue->u.ivalue == 1)
 				{
 					AddArgInputProperties(ip, inActorInfo);
 				}
@@ -927,11 +931,15 @@ HandlePropertyChangeValue(
 		}
 	}
 
-	if (findFunc) {
-		if (info->mFile != NULL && info->mFunc != NULL) {
+	if (findFunc)
+	{
+		if (info->mFile != NULL && info->mFunc != NULL)
+		{
 			// Find the function and number of parameters at the specified path
 			info->mNumArgs = FindPythonFunc(ip, info);
-		} else {
+		}
+		else
+		{
 			info->mFuncFound = false;
 			info->mNumArgs = 0;
 		}
@@ -944,10 +952,14 @@ HandlePropertyChangeValue(
 	}
 }
 
+// ---------------------------------------------------------------------------------
+//		 AddArgInputProperties
+// ---------------------------------------------------------------------------------
+// Adds inputs to the actor for the discovered arguments of the Python function
 
 static void AddArgInputProperties(
 	IsadoraParameters*	ip,
-	ActorInfo*			inActorInfo) 
+	ActorInfo*			inActorInfo)
 {
 	PluginInfo* info = GetPluginInfo_(inActorInfo);
 	int delta = info->mNumArgs;
@@ -998,8 +1010,8 @@ static void AddArgInputProperties(
 			}
 			else if (valueInit.type == kFloat)
 			{
-				valueMin.u.fvalue = -2147483647;
-				valueMax.u.fvalue = 2147483647;
+				valueMin.u.fvalue = -2147483647.f;
+				valueMax.u.fvalue = 2147483647.f;
 				availFmts = kDisplayFormatNumber;
 				curFmt = kDisplayFormatNumber;
 			}
@@ -1031,9 +1043,14 @@ static void AddArgInputProperties(
 	}
 }
 
+// ---------------------------------------------------------------------------------
+//		 AddArgInputProperties
+// ---------------------------------------------------------------------------------
+// Clears all added input properties
+
 static void ClearArgInputProperties(	
 	IsadoraParameters*	ip,
-	ActorInfo*			inActorInfo) 
+	ActorInfo*			inActorInfo)
 {
 	UInt32 propCount, argCount;
 	IzzyError err = GetPropertyCount_(ip, inActorInfo, kInputProperty, &propCount);
@@ -1042,8 +1059,7 @@ static void ClearArgInputProperties(
 	// Remove unwanted params
 	if (argCount > 0)
 	{
-		unsigned int index = propCount;
-		int i;
+		unsigned int i, index = propCount;
 		for (i=0; i<argCount; i++)
 		{
 			err = RemovePropertyProc_(ip, inActorInfo, kInputProperty, index);
@@ -1063,6 +1079,7 @@ static void ClearArgInputProperties(
 //	All members of the ActorInfo struct pointed to by outActorParams have been
 //	set to 0 on entry. You only need set functions defined by your plugin
 //	
+
 EXPORT_ void
 GetActorInfo(
 	void*				/* inParam */,
