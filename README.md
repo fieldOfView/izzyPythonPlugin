@@ -20,7 +20,7 @@ You must install a 32-bit version of Python, even if your system is capable of r
 
 The Visual C++ project is set up in a way to expect Python installed in ```C:\Python27```. If you have Python installed in a different location, or if you use a different version (such as Python 3.4), you can set an environment variable named ```PYTHON``` pointing to the location of the version of Python you want to use.
 
-The project was written for and tested with Python 2.7.10, but should also work with Python 3.4.
+The project was written for and tested with Python 2.7.10, but should also work with Python 3.4. Unfortunately the standard releases of Python do not come with the required libs to compile a debug-version of the plugin. This can be worked around by making a copy of the file ```python27.lib``` resp ```python34.lib``` in the folder ```%PYTHON%\libs```, named ```python27_d.lib``` resp ```python34_d.lib```. You only have to do this if you want to create a debug-build of the plugin.
 
 Once all the dependencies have been met, the project should compile and copy the plugin into the Isadora plugin folder.
 
