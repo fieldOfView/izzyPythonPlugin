@@ -45,6 +45,17 @@
 #include <Python.h>
 
 // ---------------------------------------------------------------------------------
+//	Python 3 support
+// ---------------------------------------------------------------------------------
+
+#if PY_MAJOR_VERSION >= 3
+#define PyString_FromString PyUnicode_FromString
+#define PyString_AsString PyUnicode_AsUTF8
+#define PyInt_FromLong PyLong_FromLong
+#define PyInt_AsLong PyLong_AsLong
+#endif
+
+// ---------------------------------------------------------------------------------
 // MacOS Specific
 // ---------------------------------------------------------------------------------
 #if TARGET_OS_MAC
