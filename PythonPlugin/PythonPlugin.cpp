@@ -213,7 +213,7 @@ static const char* sPropertyDefinitionString =
 	"INPROP		path			path	string		text				*		*		\r"
 	"INPROP		module			file	string		text				*		*		\r"
 	"INPROP		function		func	string		text				*		*		\r"
-	"INPROP		params			parm	bool		onoff				0		1		0\r"
+	"INPROP		get_args		parm	bool		trig				0		1		0\r"
 
 // OUTPUT PROPERTY DEFINITIONS
 //	TYPE 		PROPERTY NAME	ID		DATATYPE	DISPLAY FMT			MIN		MAX		INIT VALUE
@@ -234,7 +234,7 @@ enum
 	kInputPath,
 	kInputFile,
 	kInputFunc,
-	kInputParams,
+	kInputGetArgs,
 	kInputArg0,
 	
 	kOutputFuncFound = 1,
@@ -271,10 +271,9 @@ const char* sHelpStrings[] =
 	
 	"Specifies a python function within the selected module.",
 	
-	"If set to 'on', the python properties are added for function arguments.",
+	"When triggered, inputs are added for each argument of the python function.",
 	
-	"Argument for the python function. "
-	"Note that this input is mutable: it changes its type to match the output property to which it is linked.",
+	"Argument for the python function.",
 	
 	"Set to 'on' if the specified python function was found.",
 	
@@ -282,8 +281,7 @@ const char* sHelpStrings[] =
 	
 	"Outputs any error string returned by the python function. ",
 	
-	"Outputs data returned by the python function. "
-	"Note that this input is mutable: it changes its type to match the input property to which it is linked.",
+	"Outputs data returned by the python function. ",
 };
 
 // ---------------------------------------------------------------------------------
@@ -913,19 +911,10 @@ HandlePropertyChangeValue(
 			findFunc = true;
 			break;
 			
-		case kInputParams:
+		case kInputGetArgs:
 		{
-			if (inNewValue->u.ivalue)
-			{
-				if (inNewValue->u.ivalue == 1)
-				{
-					AddArgInputProperties(ip, inActorInfo);
-				}
-				else
-				{
-					ClearArgInputProperties(ip, inActorInfo);
-				}
-			}
+			ClearArgInputProperties(ip, inActorInfo);
+			AddArgInputProperties(ip, inActorInfo);
 			break;
 		}
 			
@@ -937,7 +926,7 @@ HandlePropertyChangeValue(
 
 	if (findFunc)
 	{
-		if (info->mFile != NULL && info->mFunc != NULL)
+		if (info->mFile != NULL && strlen(info->mFile) > 0 && info->mFunc != NULL && strlen(info->mFunc) > 0)
 		{
 			// Find the function and number of parameters at the specified path
 			info->mNumArgs = FindPythonFunc(ip, info);
