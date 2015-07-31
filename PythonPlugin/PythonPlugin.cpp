@@ -558,12 +558,10 @@ FindPythonFunc(
 	{	
 		// Load the module object
 		pModule = PyImport_Import(pName);
-		Py_DECREF(pName);
 		if (pModule != NULL)
 		{
 			// pDict is a borrowed reference
 			pDict = PyModule_GetDict(pModule);
-			Py_DECREF(pModule);
 			if (pDict != NULL)
 			{
 				// pFunc is a borrowed reference
@@ -578,14 +576,12 @@ FindPythonFunc(
 	if (pName != NULL)
 	{
 		pInspect = PyImport_Import(pName);
-		Py_DECREF(pName);
 		if (pInspect != NULL)
 		{
 			pName = PyString_FromString("getargspec");
 			if (pName != NULL)
 			{
 				argspec_tuple = PyObject_CallMethodObjArgs(pInspect, pName, pFunc, NULL);
-				Py_DECREF(pName);
 				if (argspec_tuple != NULL)
 				{
 					arglist = PyTuple_GetItem(argspec_tuple, 0);
@@ -607,7 +603,6 @@ FindPythonFunc(
 							
 							//grab python strings from the list
 							PyObject *argname = PyObject_Str(list);
-							Py_DECREF(list);
 							
 							//convert python string to C string
 							char *name = PyString_AsString(argname);
@@ -688,18 +683,12 @@ FindPythonFunc(
 							}
 							Py_DECREF(argname);
 						}
-						Py_DECREF(arglist);
-						Py_DECREF(defaults);
 					}
 					Py_DECREF(argspec_tuple);
 				}
-			}
-			Py_DECREF(pInspect);
+			}			
 		}
 	}
-	
-	// Clean up
-	if(pFunc != NULL) Py_DECREF(pFunc);
 	
 	// Finish the Python Interpreter
 	Py_Finalize();
@@ -743,12 +732,10 @@ CallPythonFunc(
 	{
 		// Load the module object
 		pModule = PyImport_Import(pName);
-		Py_DECREF(pName);
 		if (pModule != NULL)
 		{
 			// pDict is a borrowed reference
 			pDict = PyModule_GetDict(pModule);
-			Py_DECREF(pModule);
 			if (pDict != NULL)
 			{
 				// pFunc is a borrowed reference
@@ -794,7 +781,6 @@ CallPythonFunc(
 		}
 		// Make the call to the function
 		pValue = PyObject_CallObject(pFunc, pArgs);
-		Py_DECREF(pArgs);
 		
 		// Check for a return value and if its a tuple
 		if (pValue != NULL)
@@ -834,16 +820,8 @@ CallPythonFunc(
 				AllocateValueString_(ip, "unspecified error", &val);
 			SetOutputPropertyValue_(ip, inActorInfo, kOutputError, &val);
 			ReleaseValueString_(ip, &val);
-			
-			Py_DECREF(pErrType);
-			Py_DECREF(pErrValue);
-			Py_DECREF(pTraceback);
-		}
-	
+		}	
 	}
-	
-	// Clean up
-	if(pFunc != NULL) Py_DECREF(pFunc);
 	
 	// Finish the Python Interpreter
 	Py_Finalize();
