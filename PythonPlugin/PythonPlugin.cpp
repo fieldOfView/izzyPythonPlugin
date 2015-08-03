@@ -194,7 +194,7 @@ static const OSType	kActorClass 	= kGroupControl;
 // all plugin codes that begin with an underline, an at-sign, and a pound sign
 // (e.g., '_', '@', and '#'.)
 
-static const OSType	kActorID		= FOUR_CHAR_CODE('0OtC');
+static const OSType	kActorID		= FOUR_CHAR_CODE('zPyP');
 
 // ACTOR NAME
 // The name of the actor. This is the name that will be shown in the User Interface.
