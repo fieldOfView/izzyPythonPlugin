@@ -40,7 +40,11 @@
 #include <stdlib.h>
 #include <float.h>
 
+#if TARGET_OS_MAC
+#include <Python/Python.h>
+#else if TARGET_OS_WIN32
 #include <Python.h>
+#endif
 
 // ---------------------------------------------------------------------------------
 //	Python 3 support

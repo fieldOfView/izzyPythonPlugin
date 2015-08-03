@@ -29,3 +29,33 @@
 
 # Python byte code files
 *.pyc
+
+# OSX files
+.DS_Store
+*.swp
+*~.nib
+._*
+
+# Windows files
+Thumbs.db
+Desktop.ini
+
+# XCode
+*.pbxuser
+*.perspective
+*.perspectivev3
+*.mode1v3
+*.mode2v3
+# XCode 4
+xcuserdata
+*.xcworkspace
+
+
+# Visual Studio
+*.sdf
+*.opensdf
+*.suo
+*.pdb
+*.ilk
+*.aps
+ipch/
