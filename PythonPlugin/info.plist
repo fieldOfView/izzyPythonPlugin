@@ -9,7 +9,7 @@
 	<key>CFBundleIconFile</key>
 	<string>isadora_plugin</string>
 	<key>CFBundleIdentifier</key>
-	<string>com.fieldOfView.plugin.PythonPlugin</string>
+	<string>org.z25.plugin.PythonPlugin</string>
 	<key>CFBundleInfoDictionaryVersion</key>
 	<string>6.0</string>
 	<key>CFBundlePackageType</key>
