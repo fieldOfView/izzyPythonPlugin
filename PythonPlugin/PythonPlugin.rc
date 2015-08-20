@@ -22,16 +22,16 @@ VS_VERSION_INFO VERSIONINFO
 	{
 		BLOCK "080904E4"
 		{
-			VALUE "CompanyName", "CompanyName\000"
+			VALUE "CompanyName", "z25.org\000"
 			VALUE "FileDescription", "PythonPlugin\000"
 			VALUE "FileVersion", "1.0.0.0\000"
 			VALUE "InternalName", "PythonPlugin.dll\000"
-			VALUE "LegalCopyright", "\251CompanyName\000"
-			VALUE "LegalTrademarks", "CompanyName\256\000"
+			VALUE "LegalCopyright", "\251z25.org\000"
+			VALUE "LegalTrademarks", "z25.org\256\000"
 			VALUE "OriginalFilename", "PythonPlugin.exe\000"
 			VALUE "ProductName", "PythonPlugin 1.00\000"
 			VALUE "ProductVersion", "1.0.0.0\000"
-			VALUE "Comments", "by AuthorName\000"
+			VALUE "Comments", "by Aldo Hoeben/fieldOfView.com\000"
 		}
 	}
 	BLOCK "VarFileInfo"
