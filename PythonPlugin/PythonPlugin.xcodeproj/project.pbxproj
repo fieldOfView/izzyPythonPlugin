@@ -7,7 +7,7 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
-		6A2B8A801B700F58004D20DB /* Python.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 6A2B8A7F1B700F58004D20DB /* Python.framework */; };
+		6AD87F6D1B8614FF00412A78 /* Python.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 6AD87F6C1B8614FF00412A78 /* Python.framework */; };
 		8D01CCCA0486CAD60068D4B7 /* InfoPlist.strings in Resources */ = {isa = PBXBuildFile; fileRef = 089C167DFE841241C02AAC07 /* InfoPlist.strings */; };
 		8D01CCCE0486CAD60068D4B7 /* Carbon.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 08EA7FFBFE8413EDC02AAC07 /* Carbon.framework */; };
 		F2671FC5128570F200D03EFF /* PythonPlugin.izzyplug in CopyFiles */ = {isa = PBXBuildFile; fileRef = 8D01CCD20486CAD60068D4B7 /* PythonPlugin.izzyplug */; };
@@ -35,7 +35,7 @@
 		089C167EFE841241C02AAC07 /* English */ = {isa = PBXFileReference; fileEncoding = 10; lastKnownFileType = text.plist.strings; name = English; path = English.lproj/InfoPlist.strings; sourceTree = "<group>"; };
 		08EA7FFBFE8413EDC02AAC07 /* Carbon.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Carbon.framework; path = /System/Library/Frameworks/Carbon.framework; sourceTree = "<absolute>"; };
 		32BAE0B30371A71500C91783 /* IsadoraPluginPrefix.pch */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = IsadoraPluginPrefix.pch; sourceTree = "<group>"; };
-		6A2B8A7F1B700F58004D20DB /* Python.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Python.framework; path = ../../../../../../../../../System/Library/Frameworks/Python.framework; sourceTree = "<group>"; };
+		6AD87F6C1B8614FF00412A78 /* Python.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Python.framework; path = /System/Library/Frameworks/Python.framework; sourceTree = "<absolute>"; };
 		8D01CCD10486CAD60068D4B7 /* Info.plist */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
 		8D01CCD20486CAD60068D4B7 /* PythonPlugin.izzyplug */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = PythonPlugin.izzyplug; sourceTree = BUILT_PRODUCTS_DIR; };
 		F2C515430BC78B4000F4E205 /* IsadoraLib.a */ = {isa = PBXFileReference; lastKnownFileType = archive.ar; name = IsadoraLib.a; path = ../IsadoraLib/IsadoraLib.a; sourceTree = SOURCE_ROOT; };
@@ -52,8 +52,8 @@
 			files = (
 				8D01CCCE0486CAD60068D4B7 /* Carbon.framework in Frameworks */,
 				F2D2B6C20BB25BF100501B82 /* QuickTime.framework in Frameworks */,
-				6A2B8A801B700F58004D20DB /* Python.framework in Frameworks */,
 				F2C515440BC78B4000F4E205 /* IsadoraLib.a in Frameworks */,
+				6AD87F6D1B8614FF00412A78 /* Python.framework in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -75,7 +75,7 @@
 		089C1671FE841209C02AAC07 /* External Frameworks and Libraries */ = {
 			isa = PBXGroup;
 			children = (
-				6A2B8A7F1B700F58004D20DB /* Python.framework */,
+				6AD87F6C1B8614FF00412A78 /* Python.framework */,
 				08EA7FFBFE8413EDC02AAC07 /* Carbon.framework */,
 				F2D2B6C10BB25BF100501B82 /* QuickTime.framework */,
 			);
@@ -243,6 +243,7 @@
 				);
 				LIBRARY_SEARCH_PATHS_QUOTED_1 = "\"$(SRCROOT)/../IsadoraLib\"";
 				PRODUCT_NAME = PythonPlugin;
+				SDKROOT = "";
 				WRAPPER_EXTENSION = izzyplug;
 				ZERO_LINK = NO;
 			};
@@ -277,6 +278,7 @@
 				);
 				LIBRARY_SEARCH_PATHS_QUOTED_1 = "\"$(SRCROOT)/../IsadoraLib\"";
 				PRODUCT_NAME = PythonPlugin;
+				SDKROOT = "";
 				WRAPPER_EXTENSION = izzyplug;
 			};
 			name = Release;
